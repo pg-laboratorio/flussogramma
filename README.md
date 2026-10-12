@@ -57,12 +57,6 @@ lista.append(x)  lista.pop()  testo.upper()  testo.split()  ...
 - **Salva / Apri → Scarica file .json** salva il diagramma come file: è quello da consegnare o da riaprire in seguito.
 - **Esporta PDF** crea un PDF da stampare (una pagina o più pagine, con il codice Python in fondo se vuoi) oppure un'immagine PNG.
 
-## Per il docente
-
-L'applicazione è un unico file `index.html`, senza server e senza raccolta di dati.
-La libreria per i PDF ([jsPDF](https://github.com/parallax/jsPDF), licenza MIT) è inclusa nella cartella `vendor/`, così l'esportazione funziona anche se la rete della scuola blocca i CDN.
-
-Per pubblicarla su GitHub Pages: **Settings → Pages → Build and deployment → Deploy from a branch**, ramo `main`, cartella `/ (root)`.
 
 ## Licenza
 
