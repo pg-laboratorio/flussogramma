@@ -1,0 +1,1421 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Flussogramma: editor di diagrammi di flusso con logica Python, esecuzione passo-passo ed esportazione in PDF.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 26 26%27%3E%3Cpath d=%27M13 5l7 6-7 6-7-6z%27 fill=%27%23fcd6da%27 stroke=%27%2317232b%27 stroke-width=%271.6%27/%3E%3Crect x=%277%27 y=%2720%27 width=%2712%27 height=%275%27 rx=%272%27 fill=%27%230f6b52%27/%3E%3C/svg%3E">
+<title>Flussogramma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen workbench — dot-grid drafting canvas on the left, execution rail (console, variables, code) on the right */
+:root{
+  --bg:#e7ecea; --surface:#fbfcfb; --surface2:#f1f4f3; --ink:#17232b; --muted:#5a6a70; --rule:#cdd6d4;
+  --line:#2e3d45; --grid:#c2ccc9; --accent:#0f6b52; --accent-ink:#ffffff; --accent-soft:#d3eae1;
+  --hl:#ffe14d; --err:#c4314b; --err-f:#ffd7dd; --scrim:rgba(12,22,20,.38);
+  --decl-f:#fff0b3; --decl-s:#9c7a00; --asg-f:#ffdcc0; --asg-s:#bd5612; --in-f:#d4e8fb; --in-s:#2c6aa8;
+  --out-f:#d4efd5; --out-s:#2f7f3e; --if-f:#fcd6da; --if-s:#b23a4a; --loop-f:#e6dcfa; --loop-s:#6844b0;
+  --cm-f:#eef0ee; --cm-s:#8a928f; --oval-f:#ffffff;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --display:"Bricolage Grotesque","IBM Plex Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101614; --surface:#171f1d; --surface2:#1c2623; --ink:#e2eae7; --muted:#93a39e; --rule:#2b3734;
+  --line:#b4c4bf; --grid:#26322f; --accent:#45c49b; --accent-ink:#06231a; --accent-soft:#173a30;
+  --hl:#6e5c00; --err:#ff7088; --err-f:#4a1d26; --scrim:rgba(0,0,0,.55);
+  --decl-f:#3a3112; --decl-s:#e0bc45; --asg-f:#40271a; --asg-s:#f0975a; --in-f:#15304a; --in-s:#7db6ee;
+  --out-f:#173822; --out-s:#7fcf8c; --if-f:#47202a; --if-s:#f08896; --loop-f:#2d2347; --loop-s:#b398f0;
+  --cm-f:#222a28; --cm-s:#8d9894; --oval-f:#171f1d; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#171f1d; --surface2:#1c2623; --ink:#e2eae7; --muted:#93a39e; --rule:#2b3734;
+  --line:#b4c4bf; --grid:#26322f; --accent:#45c49b; --accent-ink:#06231a; --accent-soft:#173a30;
+  --hl:#6e5c00; --err:#ff7088; --err-f:#4a1d26; --scrim:rgba(0,0,0,.55);
+  --decl-f:#3a3112; --decl-s:#e0bc45; --asg-f:#40271a; --asg-s:#f0975a; --in-f:#15304a; --in-s:#7db6ee;
+  --out-f:#173822; --out-s:#7fcf8c; --if-f:#47202a; --if-s:#f08896; --loop-f:#2d2347; --loop-s:#b398f0;
+  --cm-f:#222a28; --cm-s:#8d9894; --oval-f:#171f1d; color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:9px;font:800 21px/1 var(--display);letter-spacing:-.015em;white-space:nowrap}
+.brand svg{width:26px;height:26px;flex:none}
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--rule);border-radius:6px;background:var(--surface);font-weight:500;font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover:not(:disabled){background:var(--surface2);border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn svg{width:14px;height:14px;flex:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover:not(:disabled){background:var(--accent);filter:brightness(1.08)}
+.btn.danger{color:var(--err)}
+select.btn{padding-right:8px}
+.speed{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.speed input{width:96px;accent-color:var(--accent)}
+.speed output{min-width:76px;color:var(--ink);font-weight:500}
+.status{font:600 12px var(--sans);letter-spacing:.02em;padding:4px 10px;border-radius:999px;background:var(--surface2);color:var(--muted);border:1px solid var(--rule);white-space:nowrap}
+.status[data-s="running"]{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.status[data-s="input"]{background:var(--hl);color:var(--ink);border-color:transparent}
+.status[data-s="error"]{background:var(--err-f);color:var(--err);border-color:transparent}
+
+/* workbench */
+.work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 370px}
+.canvas-wrap{position:relative;min-width:0;min-height:0;display:flex}
+#scroller{flex:1;min-width:0;overflow:auto;background-color:var(--bg);background-image:radial-gradient(var(--grid) 1px,transparent 1.3px);background-size:18px 18px}
+#chart{display:block;margin:0 auto;user-select:none;-webkit-user-select:none}
+.zoom{position:absolute;right:14px;bottom:14px;display:flex;align-items:center;background:var(--surface);border:1px solid var(--rule);border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.zoom button{border:0;background:none;width:32px;height:30px;cursor:pointer;font-size:16px;color:var(--ink)}
+.zoom button:hover{background:var(--surface2)}
+.zoom .zl{font:500 12px var(--mono);min-width:48px;text-align:center;font-variant-numeric:tabular-nums;color:var(--muted)}
+.zoom .fit{font:500 12px var(--sans);width:auto;padding:0 10px;border-left:1px solid var(--rule)}
+.legend-tip{position:absolute;left:14px;top:12px;font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:4px 9px;pointer-events:none}
+body.busy .legend-tip{visibility:hidden}
+
+/* chart */
+#chart .fl{fill:none;stroke:var(--line);stroke-width:1.6;stroke-linejoin:round}
+#chart .ah,#chart .jn{fill:var(--line)}
+#chart .lbl{font:500 11px var(--sans);fill:var(--muted)}
+#chart .tx{font:13px var(--mono);fill:var(--ink)}
+#chart .tx .kw{font-family:var(--sans);font-weight:600}
+#chart .sys .tx{font:600 13px var(--sans)}
+.sh{stroke-width:1.6}
+.sh2{fill:none;stroke-width:1.2}
+.k-declare .sh{fill:var(--decl-f);stroke:var(--decl-s)} .k-declare .sh2{stroke:var(--decl-s)}
+.k-assign .sh{fill:var(--asg-f);stroke:var(--asg-s)}
+.k-input .sh{fill:var(--in-f);stroke:var(--in-s)}
+.k-output .sh{fill:var(--out-f);stroke:var(--out-s)}
+.k-if .sh{fill:var(--if-f);stroke:var(--if-s)}
+.k-while .sh,.k-for .sh,.k-do .sh{fill:var(--loop-f);stroke:var(--loop-s)}
+.k-comment .sh{fill:var(--cm-f);stroke:var(--cm-s);stroke-dasharray:4 3} .k-comment .sh2{stroke:var(--cm-s)}
+#chart .k-comment .tx{font-style:italic;fill:var(--muted)}
+#chart .sys .sh{fill:var(--oval-f);stroke:var(--line)}
+#chart .blk{cursor:pointer;outline:none}
+#chart .blk:hover .sh{stroke-width:2.8}
+#chart .blk:focus-visible .sh{stroke:var(--accent);stroke-width:3}
+#chart .blk.bad .sh{stroke:var(--err);stroke-dasharray:5 3;stroke-width:2.2}
+#chart .cur .sh{fill:var(--hl);stroke:var(--ink);stroke-width:2.6;stroke-dasharray:none}
+#chart .blk.err .sh{fill:var(--err-f);stroke:var(--err);stroke-width:2.6;stroke-dasharray:none}
+#chart .ins{cursor:pointer;outline:none}
+#chart .ins-hit{fill:transparent}
+#chart .ins-dot{fill:var(--surface);stroke:var(--line);stroke-width:1.2;opacity:.55}
+#chart .ins-plus{stroke:var(--line);stroke-width:1.5;opacity:.6}
+#chart .ins:hover .ins-dot,#chart .ins:focus-visible .ins-dot,#chart .ins.open .ins-dot{fill:var(--accent);stroke:var(--accent);opacity:1}
+#chart .ins:hover .ins-plus,#chart .ins:focus-visible .ins-plus,#chart .ins.open .ins-plus{stroke:var(--accent-ink);opacity:1}
+body.busy #chart .ins{display:none}
+
+/* side rail */
+.side{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface);border-left:1px solid var(--rule)}
+.tabs{display:flex;gap:4px;padding:0 10px;border-bottom:1px solid var(--rule)}
+.tab{appearance:none;border:0;background:none;padding:11px 10px 9px;font-weight:600;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.panel{flex:1;min-height:0;display:flex;flex-direction:column}
+.sec-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 16px;font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule)}
+.sec-h button{font:500 12px var(--sans);letter-spacing:0;text-transform:none;border:0;background:none;color:var(--accent);cursor:pointer;padding:2px 4px}
+#console{flex:1 1 55%;min-height:120px;overflow:auto;padding:10px 16px;font:13px/1.55 var(--mono);background:var(--surface2);white-space:pre-wrap;overflow-wrap:anywhere}
+.ln .echo{color:var(--accent);font-weight:500} .pyprev{margin:0 0 12px;padding:7px 10px;border-radius:6px;background:var(--surface2);font-size:12px;color:var(--muted);overflow-x:auto;white-space:nowrap} .pyprev code{font:13px var(--mono);color:var(--ink)}
+.ln.in{color:var(--accent)} .ln.err{color:var(--err)} .ln.info{color:var(--muted);font-family:var(--sans);font-style:italic;font-size:12px}
+.ln.empty{color:var(--muted);font-family:var(--sans);font-size:13px}
+.inbar{display:flex;flex-direction:column;gap:6px;padding:10px 16px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.inbar label{font-size:12px;color:var(--muted)}
+.inbar.waiting{background:var(--accent-soft)}
+.inbar.waiting label{color:var(--ink);font-weight:600}
+.inrow{display:flex;gap:8px}
+.inrow input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--rule);border-radius:6px;background:var(--surface);font-family:var(--mono)}
+.inrow input:disabled{opacity:.5}
+.vars{flex:1 1 45%;min-height:100px;overflow:auto}
+.vt{width:100%;border-collapse:collapse;font-size:13px}
+.vt th{position:sticky;top:0;background:var(--surface);text-align:left;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 16px;border-bottom:1px solid var(--rule)}
+.vt td{padding:6px 16px;border-bottom:1px solid var(--rule);vertical-align:top}
+.vt td.nm{font-family:var(--mono);font-weight:500}
+.vt td.ty{color:var(--muted);font-size:12px}
+.vt td.vl{font-family:var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.vt tr.chg td.vl{background:var(--hl)}
+.vt .undef{color:var(--muted)}
+.vt .empty{color:var(--muted);font-family:var(--sans);font-size:13px;padding:14px 16px}
+.cells{display:flex;flex-wrap:wrap;gap:3px}
+.cells span{display:inline-flex;flex-direction:column;align-items:center;min-width:30px;padding:1px 5px;border:1px solid var(--rule);border-radius:4px;background:var(--surface2)}
+.cells i{font-style:normal;font-size:10px;color:var(--muted)}
+.codebar{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--rule)}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:5px 11px;font-size:13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+#code{flex:1;min-height:0;margin:0;overflow:auto;padding:12px 16px;font:13px/1.6 var(--mono);background:var(--surface2);white-space:pre;tab-size:4}
+.codenote{padding:8px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--rule)}
+
+/* popover */
+#menu{position:absolute;z-index:20;width:290px;max-width:calc(100% - 16px);background:var(--surface);border:1px solid var(--rule);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px}
+#menu h3{margin:6px 4px 4px;font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#menu h3:first-child{margin-top:0}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mi{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid transparent;border-radius:6px;background:none;cursor:pointer;text-align:left;font-size:13px}
+.mi:hover,.mi:focus-visible{background:var(--surface2);border-color:var(--rule)}
+.mi svg{width:30px;height:18px;flex:none}
+
+/* dialogs */
+.scrim{position:fixed;inset:0;z-index:50;background:var(--scrim);display:flex;align-items:center;justify-content:center;padding:16px}
+.dialog{width:min(480px,100%);max-height:calc(100% - 32px);overflow:auto;background:var(--surface);border:1px solid var(--rule);border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.25);padding:18px 20px}
+.dialog h2{margin:0 0 4px;display:flex;align-items:center;gap:10px;font:700 20px/1.2 var(--display);text-wrap:balance}
+.dialog h2 svg{width:34px;height:20px}
+.dialog .desc{margin:0 0 14px;color:var(--muted);font-size:13px;max-width:62ch}
+.fld{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.fld label{font-size:12px;font-weight:600;color:var(--muted)}
+.fld input[type=text],.fld select,.dialog textarea{padding:8px 10px;border:1px solid var(--rule);border-radius:6px;background:var(--surface2)}
+.fld input[type=text]{font-family:var(--mono)}
+.fld.chk{flex-direction:row;align-items:center;gap:8px}
+.fld.chk label{color:var(--ink);font-weight:500;font-size:13px}
+.fld.chk input{accent-color:var(--accent);width:16px;height:16px}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.errbox{margin:0 0 12px;padding:8px 12px;border-radius:6px;background:var(--err-f);color:var(--err);font-size:13px}
+.errbox div+div{margin-top:3px}
+details.hint{margin:0 0 14px;font-size:12px;color:var(--muted)}
+details.hint summary{cursor:pointer;font-weight:600}
+details.hint dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:8px 0 0}
+details.hint dt{font-weight:600;color:var(--ink)}
+details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
+.dlg-actions{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}
+.dlg-actions>div{display:flex;flex-wrap:wrap;gap:6px}
+.dialog textarea{width:100%;min-height:200px;font:12px/1.5 var(--mono);resize:vertical;box-sizing:border-box}
+.filepick{font-size:13px}
+.ex-span{grid-column:span 2}
+.infobox{margin:0 0 12px;padding:8px 12px;border-radius:6px;background:var(--accent-soft);color:var(--ink);font-size:13px}
+
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:calc(100% - 32px)}
+
+@media (max-width:900px){
+  html,body{height:auto}
+  .work{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}
+  .side{border-left:0;border-top:1px solid var(--rule);min-height:480px}
+  .speed input{width:80px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+</style>
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+
+
+<header class="bar">
+  <div class="brand">
+    <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 1v4" stroke="currentColor" stroke-width="1.8"/><path d="M13 5l7 6-7 6-7-6z" fill="var(--if-f)" stroke="currentColor" stroke-width="1.6"/><path d="M13 17v4" stroke="currentColor" stroke-width="1.8"/><rect x="7" y="21" width="12" height="4" rx="2" fill="var(--accent)"/></svg>
+    Flussogramma
+  </div>
+  <div class="tools">
+    <select class="btn" id="examples" aria-label="Carica un esempio"></select>
+    <button class="btn" id="btnNew" type="button">Nuovo</button>
+    <button class="btn" id="btnUndo" type="button" title="Annulla (Ctrl+Z)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3L2 6l3 3"/><path d="M2 6h7a4 4 0 010 8H6"/></svg>Annulla</button>
+    <button class="btn" id="btnRedo" type="button" title="Ripristina (Ctrl+Y)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 3l3 3-3 3"/><path d="M14 6H7a4 4 0 000 8h3"/></svg>Ripristina</button>
+    <button class="btn" id="btnIO" type="button">Salva / Apri</button>
+    <button class="btn" id="btnExport" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5"/><path d="M2.5 11v2.5h11V11"/></svg>Esporta PDF</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="tools">
+    <button class="btn primary" id="btnRun" type="button"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg><span>Esegui</span></button>
+    <button class="btn" id="btnStep" type="button" title="Esegue un blocco alla volta"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l7-5.5z"/><rect x="11" y="2.5" width="2" height="11"/></svg>Passo</button>
+    <button class="btn" id="btnStop" type="button" disabled><svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>Stop</button>
+    <label class="speed" for="speed">Velocità <input type="range" id="speed" min="0" max="5" step="1" value="3"><output id="speedLbl">Media</output></label>
+    <span class="status" id="status" data-s="idle">Pronto</span>
+  </div>
+</header>
+
+<main class="work">
+  <section class="canvas-wrap" id="wrap">
+    <div id="scroller"><svg id="chart" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Diagramma di flusso"></svg></div>
+    <div class="legend-tip">Clicca un <b>+</b> per aggiungere un blocco, un blocco per modificarlo</div>
+    <div class="zoom" role="group" aria-label="Zoom">
+      <button type="button" id="zOut" aria-label="Riduci">−</button>
+      <span class="zl" id="zLbl">100%</span>
+      <button type="button" id="zIn" aria-label="Ingrandisci">+</button>
+      <button type="button" class="fit" id="zFit">Adatta</button>
+    </div>
+    <div id="menu" hidden role="menu"></div>
+  </section>
+
+  <aside class="side">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tabRun" aria-selected="true" aria-controls="pRun">Esecuzione</button>
+      <button class="tab" role="tab" id="tabCode" aria-selected="false" aria-controls="pCode">Codice</button>
+    </div>
+    <section class="panel" id="pRun" role="tabpanel" aria-labelledby="tabRun">
+      <div class="sec-h">Console <button type="button" id="btnClear">Pulisci</button></div>
+      <div id="console" aria-live="polite"><div class="ln empty">Premi Esegui per avviare il programma. Qui compariranno gli Output.</div></div>
+      <form class="inbar" id="inForm" autocomplete="off">
+        <label for="inField" id="inLbl">Input: in attesa del programma</label>
+        <div class="inrow"><input id="inField" type="text" disabled spellcheck="false"><button class="btn primary" id="inBtn" type="submit" disabled>Invia</button></div>
+      </form>
+      <div class="sec-h">Variabili</div>
+      <div class="vars"><table class="vt"><thead><tr><th>Nome</th><th>Tipo</th><th>Valore</th></tr></thead><tbody id="varsBody"></tbody></table></div>
+    </section>
+    <section class="panel" id="pCode" role="tabpanel" aria-labelledby="tabCode" hidden>
+      <div class="codebar">
+        <div class="seg" role="group" aria-label="Linguaggio">
+          <button type="button" data-lang="python" aria-pressed="true">Python</button>
+          <button type="button" data-lang="pseudo" aria-pressed="false">Pseudocodice</button>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn" type="button" id="btnCopyCode">Copia</button>
+      </div>
+      <pre id="code"></pre>
+      <div class="codenote">Il codice si aggiorna da solo quando modifichi il diagramma.</div>
+    </section>
+  </aside>
+</main>
+
+<div class="scrim" id="edScrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="edTitle">
+    <h2 id="edTitle"></h2>
+    <p class="desc" id="edDesc"></p>
+    <form id="edForm" autocomplete="off">
+      <div id="edFields"></div>
+      <div class="pyprev">In Python: <code id="edPy"></code></div>
+      <div class="errbox" id="edErr" hidden></div>
+      <details class="hint">
+        <summary>Sintassi Python ammessa</summary>
+        <dl>
+          <dt>Aritmetica</dt><dd>+  -  *  /  //  %  **</dd>
+          <dt>Testo</dt><dd>"Ciao " + nome   str(x)   f"Somma: {s}"</dd>
+          <dt>Confronto</dt><dd>==  !=  &lt;  &gt;  &lt;=  &gt;=  in   (anche 0 &lt; x &lt; 10)</dd>
+          <dt>Logica</dt><dd>and  or  not   True  False  None</dd>
+          <dt>Liste</dt><dd>[]  [0] * 5  voti[i]  voti[-1]  lista.append(x)  len(lista)</dd>
+          <dt>Funzioni</dt><dd>abs int float str bool len round min max sum sorted list</dd>
+          <dt>Moduli</dt><dd>math.sqrt math.floor math.ceil math.pi random.randint(a, b) random.choice(l)</dd>
+          <dt>Metodi</dt><dd>append insert pop remove index count sort reverse · upper lower strip split replace find join</dd>
+        </dl>
+      </details>
+      <div class="dlg-actions">
+        <div>
+          <button class="btn danger" type="button" id="edDel">Elimina</button>
+          <button class="btn" type="button" id="edCopy">Copia</button>
+          <button class="btn" type="button" id="edCut">Taglia</button>
+        </div>
+        <div>
+          <button class="btn" type="button" id="edCancel">Annulla</button>
+          <button class="btn primary" type="submit">OK</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="scrim" id="ioScrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ioTitle">
+    <h2 id="ioTitle">Salva / Apri</h2>
+    <p class="desc">Il diagramma si salva da solo in questo browser. Per conservarlo o passarlo agli studenti, copia il testo qui sotto in un file .json; per aprirne uno, incolla il testo o scegli il file.</p>
+    <textarea id="ioText" spellcheck="false" aria-label="Diagramma in formato JSON"></textarea>
+    <p class="filepick"><label for="ioFile">Apri da file: </label><input type="file" id="ioFile" accept=".json,application/json,text/plain"></p>
+    <div class="errbox" id="ioErr" hidden></div>
+    <div class="dlg-actions">
+      <div><button class="btn" type="button" id="ioCopy">Copia testo</button><button class="btn" type="button" id="ioSave">Scarica file .json</button></div>
+      <div><button class="btn" type="button" id="ioClose">Chiudi</button><button class="btn primary" type="button" id="ioLoad">Apri questo diagramma</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="exScrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="exTitleH">
+    <h2 id="exTitleH">Esporta il diagramma</h2>
+    <p class="desc">Crea un PDF da stampare o consegnare, oppure un'immagine PNG. Il diagramma viene esportato su sfondo bianco, senza i pulsanti +.</p>
+    <div class="fld"><label for="exTitle">Titolo in alto (facoltativo)</label><input type="text" id="exTitle" placeholder="es. Esercizio 3 – Somma da 1 a N" autocomplete="off"></div>
+    <div class="row3 ex-row">
+      <div class="fld"><label for="exPage">Formato pagina</label><select id="exPage"><option value="a4" selected>A4</option><option value="a3">A3</option></select></div>
+      <div class="fld ex-span"><label for="exLayout">Impaginazione</label><select id="exLayout"><option value="one" selected>Tutto in una pagina</option><option value="multi">Più pagine, a grandezza piena</option></select></div>
+    </div>
+    <div class="fld chk"><input type="checkbox" id="exCode"><label for="exCode">Aggiungi il codice Python in fondo</label></div>
+    <div class="errbox" id="exMsg" hidden></div>
+    <div class="dlg-actions">
+      <div><button class="btn" type="button" id="exPng">Scarica PNG</button></div>
+      <div><button class="btn" type="button" id="exClose">Chiudi</button><button class="btn primary" type="button" id="exPdf">Scarica PDF</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden role="status"></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const NB=' ';
+const IDRE=/^[A-Za-z_À-ɏ][A-Za-z0-9_À-ɏ]*$/;
+const KEYWORDS=new Set('False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield'.split(' '));
+const VTL={int:'numero intero',float:'numero decimale',str:'testo'};
+let uid=1; const nid=()=>'n'+(uid++);
+
+/* ---------- model ---------- */
+const DEF={
+  assign:{target:'',expr:''}, input:{target:'',vtype:'int',msg:''}, output:{expr:'',nl:true},
+  if:{cond:'',yes:[],no:[]}, while:{cond:'',body:[]},
+  for:{v:'i',start:'0',stop:'10',step:'1',body:[]}, do:{cond:'',body:[]}, comment:{text:''}
+};
+function make(t,props){return Object.assign({id:nid(),t},JSON.parse(JSON.stringify(DEF[t])),props||{});}
+const kids=n=>n.t==='if'?[n.yes,n.no]:(n.body?[n.body]:[]);
+function walk(arr,fn){for(const n of arr){fn(n);kids(n).forEach(a=>walk(a,fn));}}
+function sanitize(arr){
+  if(!Array.isArray(arr)) return [];
+  return arr.filter(n=>n&&DEF[n.t]).map(n=>{
+    const o={id:nid(),t:n.t};
+    for(const k in DEF[n.t]){const d=DEF[n.t][k],v=n[k];
+      if(Array.isArray(d)) o[k]=sanitize(v);
+      else if(typeof d==='boolean') o[k]=typeof v==='boolean'?v:d;
+      else o[k]=v==null?d:String(v);}
+    if(o.t==='input'&&!VTL[o.vtype]) o.vtype='int';
+    return o;});
+}
+
+const A=(target,expr)=>make('assign',{target,expr});
+const I=(target,vtype,msg)=>make('input',{target,vtype:vtype||'int',msg:msg||''});
+const O=(expr,nl=true)=>make('output',{expr,nl});
+const IF=(cond,yes,no)=>make('if',{cond,yes,no:no||[]});
+const W=(cond,body)=>make('while',{cond,body});
+const F=(v,start,stop,step,body)=>make('for',{v,start,stop,step,body});
+const DO=(body,cond)=>make('do',{body,cond});
+const C=text=>make('comment',{text});
+const EXAMPLES=[
+  {name:'Somma da 1 a N',build:()=>[I('n','int','"Quanti numeri vuoi sommare? "'),A('somma','0'),F('i','1','n + 1','1',[A('somma','somma + i')]),O('"La somma è", somma')]},
+  {name:'Pari o dispari',build:()=>[I('n','int','"Inserisci un numero intero: "'),IF('n % 2 == 0',[O('n, "è pari"')],[O('n, "è dispari"')])]},
+  {name:'Tabellina',build:()=>[I('n','int','"Di quale numero vuoi la tabellina? "'),F('i','1','11','1',[O('n, "x", i, "=", n * i')])]},
+  {name:'Conto alla rovescia',build:()=>[A('n','5'),W('n > 0',[O('n'),A('n','n - 1')]),O('"Via!"')]},
+  {name:'Indovina il numero',build:()=>[C('Il computer sceglie un numero a caso'),A('segreto','random.randint(1, 100)'),A('tentativi','0'),O('"Ho pensato un numero da 1 a 100"'),DO([I('tentativo','int','"Il tuo tentativo: "'),A('tentativi','tentativi + 1'),IF('tentativo < segreto',[O('"Più grande!"')],[IF('tentativo > segreto',[O('"Più piccolo!"')],[])])],'tentativo != segreto'),O('f"Indovinato in {tentativi} tentativi"')]},
+  {name:'Media dei voti (lista)',build:()=>[A('voti','[0.0] * 5'),A('somma','0'),F('i','0','5','1',[I('voti[i]','float','f"Voto {i + 1}: "'),A('somma','somma + voti[i]')]),O('f"Media: {somma / 5:.2f}"')]},
+  {name:'Lista della spesa (append)',build:()=>[A('spesa','[]'),I('cosa','str','"Cosa compri? (Invio vuoto per finire) "'),W('cosa != ""',[A('','spesa.append(cosa)'),I('cosa','str','"Cosa compri? "')]),O('"Hai", len(spesa), "articoli:", spesa')]}
+];
+
+let prog={body:[]};
+
+/* ---------- values (Python semantics) ---------- */
+class SynErr extends Error{}
+class RunErr extends Error{}
+class Fl{constructor(v){this.v=v;}}
+const isF=x=>x instanceof Fl;
+const isNum=x=>typeof x==='number'||typeof x==='boolean'||x instanceof Fl;
+const isIntLike=x=>typeof x==='number'||typeof x==='boolean';
+const nv=x=>x instanceof Fl?x.v:(typeof x==='boolean'?(x?1:0):x);
+const mk=(v,f)=>f?new Fl(v):v;
+function pyType(x){if(x===null||x===undefined) return 'NoneType';if(typeof x==='boolean') return 'bool';if(typeof x==='number') return 'int';if(x instanceof Fl) return 'float';if(typeof x==='string') return 'str';if(Array.isArray(x)) return 'list';return '?';}
+function fmtFloat(v){if(isNaN(v)) return 'nan';if(!isFinite(v)) return v>0?'inf':'-inf';if(Number.isInteger(v)&&Math.abs(v)<1e16) return v.toFixed(1);return String(v);}
+function repr(x){
+  if(x===null||x===undefined) return 'None';
+  if(typeof x==='boolean') return x?'True':'False';
+  if(typeof x==='number') return String(x);
+  if(x instanceof Fl) return fmtFloat(x.v);
+  if(typeof x==='string') return (x.includes("'")&&!x.includes('"'))?`"${x}"`:`'${x.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n')}'`;
+  if(Array.isArray(x)) return '['+x.map(repr).join(', ')+']';
+  return String(x);
+}
+const pyStr=x=>typeof x==='string'?x:repr(x);
+const truthy=x=>x===null||x===undefined?false:typeof x==='boolean'?x:isNum(x)?nv(x)!==0:(typeof x==='string'||Array.isArray(x))?x.length>0:true;
+const needNum=(x,op)=>{if(!isNum(x)) throw new RunErr(`${op} vuole un numero, ma ha ricevuto ${pyType(x)} ${repr(x)}`);};
+const needInt=(x,op)=>{if(!isIntLike(x)) throw new RunErr(`${op} vuole un int, ma ha ricevuto ${pyType(x)} ${repr(x)}`);};
+const needStr=(x,op)=>{if(typeof x!=='string') throw new RunErr(`${op} vuole un str, ma ha ricevuto ${pyType(x)} ${repr(x)}`);};
+const needList=(x,op)=>{if(!Array.isArray(x)) throw new RunErr(`${op} vuole una list, ma ha ricevuto ${pyType(x)}`);};
+function pyEq(x,y){
+  if(isNum(x)&&isNum(y)) return nv(x)===nv(y);
+  if(Array.isArray(x)&&Array.isArray(y)) return x.length===y.length&&x.every((e,i)=>pyEq(e,y[i]));
+  if((x===null||x===undefined)&&(y===null||y===undefined)) return true;
+  return x===y;
+}
+function pyOrder(x,y,op){
+  if(isNum(x)&&isNum(y)){const a=nv(x),b=nv(y);return a<b?-1:a>b?1:0;}
+  if(typeof x==='string'&&typeof y==='string') return x<y?-1:x>y?1:0;
+  if(Array.isArray(x)&&Array.isArray(y)){for(let i=0;i<Math.min(x.length,y.length);i++){if(!pyEq(x[i],y[i])) return pyOrder(x[i],y[i],op);}return x.length-y.length;}
+  throw new RunErr(`non posso confrontare ${pyType(x)} e ${pyType(y)} con «${op}»`);
+}
+function contains(c,x,op){
+  if(typeof c==='string'){needStr(x,`«${op}» su un testo`);return c.includes(x);}
+  if(Array.isArray(c)) return c.some(e=>pyEq(e,x));
+  throw new RunErr(`«${op}» funziona con str e list, non con ${pyType(c)}`);
+}
+function typeErr(op,x,y){
+  let m=`non posso usare «${op}» tra ${pyType(x)} e ${pyType(y)}`;
+  if(op==='+'&&(typeof x==='string'||typeof y==='string')) m+=': per unire testo e numeri usa str(...), una f-string, oppure separa i valori con la virgola nell\'Output';
+  return new RunErr(m);
+}
+function repeatSeq(s,n){n=Math.max(0,nv(n));if(typeof s==='string') return s.repeat(n);const r=[];for(let k=0;k<n;k++) r.push(...s);return r;}
+function binop(op,x,y){
+  if(op==='+'){
+    if(typeof x==='string'&&typeof y==='string') return x+y;
+    if(Array.isArray(x)&&Array.isArray(y)) return x.concat(y);
+    if(isNum(x)&&isNum(y)) return mk(nv(x)+nv(y),isF(x)||isF(y));
+    throw typeErr(op,x,y);
+  }
+  if(op==='*'){
+    if((typeof x==='string'||Array.isArray(x))&&isIntLike(y)) return repeatSeq(x,y);
+    if(isIntLike(x)&&(typeof y==='string'||Array.isArray(y))) return repeatSeq(y,x);
+  }
+  if(!isNum(x)||!isNum(y)) throw typeErr(op,x,y);
+  const a=nv(x),b=nv(y),f=isF(x)||isF(y);
+  switch(op){
+    case '-': return mk(a-b,f);
+    case '*': return mk(a*b,f);
+    case '/': if(b===0) throw new RunErr('divisione per zero (ZeroDivisionError)');return new Fl(a/b);
+    case '//': if(b===0) throw new RunErr('divisione per zero (ZeroDivisionError)');return mk(Math.floor(a/b),f);
+    case '%': if(b===0) throw new RunErr('resto della divisione per zero (ZeroDivisionError)');return mk(((a%b)+b)%b,f);
+    case '**': return (f||b<0)?new Fl(Math.pow(a,b)):Math.pow(a,b);
+  }
+}
+function normIdx(c,i){
+  if(!isIntLike(i)) throw new RunErr(`l'indice deve essere un int, non ${pyType(i)} ${repr(i)}`);
+  let k=nv(i);const n=c.length;if(k<0) k+=n;
+  if(k<0||k>=n) throw new RunErr(`indice ${nv(i)} fuori dai limiti (IndexError): ${n?`gli indici validi vanno da 0 a ${n-1}`:'la sequenza è vuota'}`);
+  return k;
+}
+function getitem(c,i){if(typeof c!=='string'&&!Array.isArray(c)) throw new RunErr(`non si possono usare le [ ] su un ${pyType(c)}`);return c[normIdx(c,i)];}
+function setitem(c,i,v){
+  if(typeof c==='string') throw new RunErr('le stringhe (str) non si possono modificare una lettera alla volta');
+  if(!Array.isArray(c)) throw new RunErr(`non si possono usare le [ ] su un ${pyType(c)}`);
+  c[normIdx(c,i)]=v;
+}
+function roundHalfEven(v){if(Math.abs(v%1)===0.5) return 2*Math.round(v/2);return Math.round(v);}
+const FLOATRE=/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+const seqArgs=(args,op)=>{const a=args.length===1?args[0]:args;if(args.length===1&&typeof a!=='string'&&!Array.isArray(a)) throw new RunErr(`${op}() con un solo argomento vuole una lista`);const l=Array.isArray(a)?a:[...a];if(!l.length) throw new RunErr(`${op}() di una sequenza vuota`);return l;};
+
+const BI={
+  abs:[1,1,([x])=>{needNum(x,'abs()');return mk(Math.abs(nv(x)),isF(x));}],
+  int:[1,1,([x])=>{if(typeof x==='string'){if(!/^\s*[+-]?\d+\s*$/.test(x)) throw new RunErr(`int(): il testo ${repr(x)} non è un numero intero`);return parseInt(x,10);}needNum(x,'int()');return Math.trunc(nv(x));}],
+  float:[1,1,([x])=>{if(typeof x==='string'){const t=x.trim();if(!FLOATRE.test(t)) throw new RunErr(`float(): il testo ${repr(x)} non è un numero`);return new Fl(parseFloat(t));}needNum(x,'float()');return new Fl(nv(x));}],
+  str:[1,1,([x])=>pyStr(x)],
+  bool:[1,1,([x])=>truthy(x)],
+  len:[1,1,([x])=>{if(typeof x==='string'||Array.isArray(x)) return x.length;throw new RunErr(`len() non funziona con ${pyType(x)}`);}],
+  round:[1,2,([x,n])=>{needNum(x,'round()');if(n===undefined) return roundHalfEven(nv(x));needInt(n,'round()');const p=10**nv(n);const r=Math.round(nv(x)*p)/p;return isF(x)?new Fl(r):Math.round(r);}],
+  min:[1,99,a=>seqArgs(a,'min').reduce((m,e)=>pyOrder(e,m,'min')<0?e:m)],
+  max:[1,99,a=>seqArgs(a,'max').reduce((m,e)=>pyOrder(e,m,'max')>0?e:m)],
+  sum:[1,1,([l])=>{needList(l,'sum()');return l.reduce((s,e)=>binop('+',s,e),0);}],
+  sorted:[1,1,([l])=>{if(typeof l==='string') l=[...l];needList(l,'sorted()');return l.slice().sort((a,b)=>pyOrder(a,b,'sorted'));}],
+  list:[1,1,([x])=>{if(typeof x==='string') return [...x];needList(x,'list()');return x.slice();}]
+};
+const MODS={
+  math:{
+    sqrt:[1,1,([x])=>{needNum(x,'math.sqrt()');if(nv(x)<0) throw new RunErr('math.sqrt() di un numero negativo');return new Fl(Math.sqrt(nv(x)));}],
+    floor:[1,1,([x])=>(needNum(x,'math.floor()'),Math.floor(nv(x)))],
+    ceil:[1,1,([x])=>(needNum(x,'math.ceil()'),Math.ceil(nv(x)))],
+    fabs:[1,1,([x])=>(needNum(x,'math.fabs()'),new Fl(Math.abs(nv(x))))],
+    pow:[2,2,([x,y])=>(needNum(x,'math.pow()'),needNum(y,'math.pow()'),new Fl(Math.pow(nv(x),nv(y))))],
+    sin:[1,1,([x])=>(needNum(x,'math.sin()'),new Fl(Math.sin(nv(x))))],
+    cos:[1,1,([x])=>(needNum(x,'math.cos()'),new Fl(Math.cos(nv(x))))],
+    tan:[1,1,([x])=>(needNum(x,'math.tan()'),new Fl(Math.tan(nv(x))))],
+    log:[1,2,([x,b])=>{needNum(x,'math.log()');if(nv(x)<=0) throw new RunErr('math.log() vuole un numero maggiore di 0');if(b===undefined) return new Fl(Math.log(nv(x)));needNum(b,'math.log()');return new Fl(Math.log(nv(x))/Math.log(nv(b)));}],
+    log10:[1,1,([x])=>{needNum(x,'math.log10()');if(nv(x)<=0) throw new RunErr('math.log10() vuole un numero maggiore di 0');return new Fl(Math.log10(nv(x)));}]
+  },
+  random:{
+    randint:[2,2,([a,b])=>{needInt(a,'random.randint()');needInt(b,'random.randint()');a=nv(a);b=nv(b);if(a>b) throw new RunErr('random.randint(a, b) vuole a ≤ b');return a+Math.floor(Math.random()*(b-a+1));}],
+    random:[0,0,()=>new Fl(Math.random())],
+    uniform:[2,2,([a,b])=>(needNum(a,'random.uniform()'),needNum(b,'random.uniform()'),new Fl(nv(a)+Math.random()*(nv(b)-nv(a))))],
+    choice:[1,1,([s])=>{if(typeof s!=='string'&&!Array.isArray(s)) throw new RunErr('random.choice() vuole una lista o un testo');if(!s.length) throw new RunErr('random.choice() di una sequenza vuota');return s[Math.floor(Math.random()*s.length)];}],
+    shuffle:[1,1,([l])=>{needList(l,'random.shuffle()');for(let i=l.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[l[i],l[j]]=[l[j],l[i]];}return null;}]
+  }
+};
+const MCONST={math:{pi:new Fl(Math.PI),e:new Fl(Math.E)}};
+const METH={append:[1,1],insert:[2,2],pop:[0,1],remove:[1,1],index:[1,1],count:[1,1],sort:[0,0],reverse:[0,0],clear:[0,0],upper:[0,0],lower:[0,0],strip:[0,0],split:[0,1],replace:[2,2],find:[1,1],startswith:[1,1],endswith:[1,1],isdigit:[0,0],join:[1,1],capitalize:[0,0]};
+function callMethod(o,name,a){
+  if(Array.isArray(o)){
+    const find=()=>{const i=o.findIndex(e=>pyEq(e,a[0]));if(i<0) throw new RunErr(`${name}(): ${repr(a[0])} non è nella lista`);return i;};
+    switch(name){
+      case 'append': o.push(a[0]);return null;
+      case 'insert':{needInt(a[0],'insert()');let i=nv(a[0]);if(i<0) i=Math.max(0,o.length+i);o.splice(Math.min(i,o.length),0,a[1]);return null;}
+      case 'pop': if(!o.length) throw new RunErr('pop() su una lista vuota');return a.length?o.splice(normIdx(o,a[0]),1)[0]:o.pop();
+      case 'remove': o.splice(find(),1);return null;
+      case 'index': return find();
+      case 'count': return o.filter(e=>pyEq(e,a[0])).length;
+      case 'sort': o.sort((x,y)=>pyOrder(x,y,'sort'));return null;
+      case 'reverse': o.reverse();return null;
+      case 'clear': o.length=0;return null;
+    }
+  }else if(typeof o==='string'){
+    switch(name){
+      case 'upper': return o.toUpperCase();
+      case 'lower': return o.toLowerCase();
+      case 'strip': return o.trim();
+      case 'capitalize': return o?o[0].toUpperCase()+o.slice(1).toLowerCase():o;
+      case 'isdigit': return o.length>0&&/^\d+$/.test(o);
+      case 'split': if(!a.length) return o.trim().split(/\s+/).filter(Boolean);needStr(a[0],'split()');if(a[0]==='') throw new RunErr('split(): il separatore non può essere vuoto');return o.split(a[0]);
+      case 'replace': needStr(a[0],'replace()');needStr(a[1],'replace()');return o.split(a[0]).join(a[1]);
+      case 'find': needStr(a[0],'find()');return o.indexOf(a[0]);
+      case 'count': needStr(a[0],'count()');return a[0]===''?o.length+1:o.split(a[0]).length-1;
+      case 'startswith': needStr(a[0],'startswith()');return o.startsWith(a[0]);
+      case 'endswith': needStr(a[0],'endswith()');return o.endsWith(a[0]);
+      case 'join': needList(a[0],'join()');a[0].forEach(e=>{if(typeof e!=='string') throw new RunErr(`join(): gli elementi devono essere str, trovato ${pyType(e)} ${repr(e)}`);});return a[0].join(o);
+    }
+  }
+  throw new RunErr(`un valore di tipo ${pyType(o)} non ha il metodo «${name}()»`);
+}
+
+/* ---------- parser (Python expressions) ---------- */
+const ESCMAP={n:'\n',t:'\t','\\':'\\',"'":"'",'"':'"'};
+const unescape=s=>s.replace(/\\(.)/g,(m,c)=>ESCMAP[c]!==undefined?ESCMAP[c]:m);
+const SPECRE=/^([<>^])?(\d+)?(?:\.(\d+))?([fd])?$/;
+function tokenize(src){
+  const t=[];let i=0;const L=src.length;
+  const readStr=i=>{const q=src[i];let j=i+1,raw='';while(j<L&&src[j]!==q){if(src[j]==='\\'&&j+1<L){raw+=src[j]+src[j+1];j+=2;continue;}raw+=src[j++];}if(j>=L) throw new SynErr(`testo non chiuso: manca la virgoletta ${q}`);return {raw,end:j+1};};
+  while(i<L){
+    const c=src[i];
+    if(/\s/.test(c)){i++;continue;}
+    if(/[0-9]/.test(c)||(c==='.'&&/[0-9]/.test(src[i+1]||''))){
+      let j=i,fl=false;while(/[0-9_]/.test(src[j]||''))j++;
+      if(src[j]==='.'&&!/[A-Za-z_]/.test(src[j+1]||'')){fl=true;j++;while(/[0-9_]/.test(src[j]||''))j++;}
+      if(/[eE]/.test(src[j]||'')&&/^[+-]?[0-9]/.test(src.substr(j+1,2))){fl=true;j++;if(/[+-]/.test(src[j]))j++;while(/[0-9]/.test(src[j]||''))j++;}
+      const raw=src.slice(i,j);t.push({k:'num',v:parseFloat(raw.replace(/_/g,'')),fl});i=j;continue;}
+    if((c==='f'||c==='F')&&(src[i+1]==='"'||src[i+1]==="'")){const r=readStr(i+1);t.push({k:'fstr',raw:r.raw});i=r.end;continue;}
+    if(c==='"'||c==="'"){const r=readStr(i);t.push({k:'str',v:unescape(r.raw)});i=r.end;continue;}
+    if(/[A-Za-z_À-ɏ]/.test(c)){let j=i;while(j<L&&/[A-Za-z0-9_À-ɏ]/.test(src[j]))j++;t.push({k:'id',v:src.slice(i,j)});i=j;continue;}
+    const two=src.substr(i,2);
+    if(['**','//','==','!=','<=','>='].includes(two)){t.push({k:'op',v:two});i+=2;continue;}
+    if(two==='<>') throw new SynErr('in Python «diverso» si scrive !=');
+    if(two==='&&') throw new SynErr('in Python si scrive and');
+    if(two==='||') throw new SynErr('in Python si scrive or');
+    if(/^[+\-*/%]=$/.test(two)) throw new SynErr(`qui va solo il valore: invece di «x ${two} 1» scrivi Variabile = x e Valore = x ${two[0]} 1`);
+    if(c==='=') throw new SynErr('«=» serve ad assegnare: per confrontare due valori usa ==');
+    if(c==='!') throw new SynErr('in Python la negazione si scrive not');
+    if(c==='^') throw new SynErr('in Python la potenza si scrive **');
+    if(c==='&') throw new SynErr('per unire testi in Python usa + (con str()) oppure una f-string');
+    if(c===':') throw new SynErr('i due punti qui non servono (le slice [a:b] non sono supportate)');
+    if('+-*/%()[],.<>'.includes(c)){t.push({k:'op',v:c});i++;continue;}
+    throw new SynErr(`carattere non valido «${c}»`);
+  }
+  t.push({k:'eof'});return t;
+}
+const pcache=new Map();
+function parse(src,mode){
+  mode=mode||'expr';src=String(src);const key=mode+'\u0000'+src;
+  let r=pcache.get(key);
+  if(!r){try{r={ast:parseInner(src,mode)};}catch(e){r={err:e instanceof SynErr?e:new SynErr(String(e&&e.message||e))};}pcache.set(key,r);if(pcache.size>5000) pcache.clear();}
+  if(r.err) throw r.err;return r.ast;
+}
+function parseInner(src,mode){
+  const t=tokenize(src);let p=0;
+  const isOp=v=>t[p].k==='op'&&t[p].v===v;
+  const isKw=v=>t[p].k==='id'&&t[p].v===v;
+  const expect=v=>{if(!isOp(v)) throw new SynErr(`manca «${v}»`);p++;};
+  const desc=k=>k.k==='eof'?'la fine':k.k==='op'?`«${k.v}»`:k.k==='id'?`«${k.v}»`:k.k==='num'?'un numero':'un testo';
+  function args(close){const a=[];while(!isOp(close)){a.push(or());if(isOp(',')) p++;else break;}expect(close);return a;}
+  function arity(spec,n,name){if(n<spec[0]||n>spec[1]) throw new SynErr(`${name}() vuole ${spec[0]===spec[1]?spec[0]:`da ${spec[0]} a ${spec[1]}`} argoment${spec[1]===1?'o':'i'}, ne hai dati ${n}`);}
+  function or(){let a=and();while(isKw('or')){p++;a={t:'or',a,b:and()};}return a;}
+  function and(){let a=not();while(isKw('and')){p++;a={t:'and',a,b:not()};}return a;}
+  function not(){if(isKw('not')){p++;return {t:'un',op:'not',a:not()};}return cmp();}
+  function cmp(){
+    const first=arith(),ops=[],items=[first];
+    for(;;){
+      const k=t[p];let op=null;
+      if(k.k==='op'&&['==','!=','<','>','<=','>='].includes(k.v)){op=k.v;p++;}
+      else if(isKw('in')){op='in';p++;}
+      else if(isKw('not')&&t[p+1].k==='id'&&t[p+1].v==='in'){op='not in';p+=2;}
+      else if(isKw('is')) throw new SynErr('«is» non è supportato: usa ==');
+      else break;
+      ops.push(op);items.push(arith());
+    }
+    return ops.length?{t:'cmp',ops,items}:first;
+  }
+  function arith(){let a=term();while(isOp('+')||isOp('-')){const op=t[p++].v;a={t:'bin',op,a,b:term()};}return a;}
+  function term(){let a=factor();while(isOp('*')||isOp('/')||isOp('//')||isOp('%')){const op=t[p++].v;a={t:'bin',op,a,b:factor()};}return a;}
+  function factor(){if(isOp('-')||isOp('+')){const op=t[p++].v;return {t:'un',op,a:factor()};}return power();}
+  function power(){const a=post();if(isOp('**')){p++;return {t:'bin',op:'**',a,b:factor()};}return a;}
+  function post(){
+    let a=atom();
+    for(;;){
+      if(isOp('[')){p++;if(isOp(':')||isOp(']')) throw new SynErr('le slice [a:b] non sono supportate');const i=or();if(!isOp(']')) throw new SynErr(isOp(',')||t[p].k!=='op'?'manca «]»':'le slice [a:b] non sono supportate');p++;a={t:'idx',a,i};continue;}
+      if(isOp('.')){p++;const nm=t[p];if(nm.k!=='id') throw new SynErr('dopo il punto serve un nome');p++;
+        if(isOp('(')){p++;const ar=args(')');
+          if(a.t==='mod'){const f=MODS[a.name][nm.v];if(!f) throw new SynErr(`${a.name}.${nm.v}() non esiste (o non è supportata)`);arity(f,ar.length,`${a.name}.${nm.v}`);a={t:'mcall',mod:a.name,f:nm.v,args:ar};}
+          else{const m=METH[nm.v];if(!m) throw new SynErr(`il metodo «${nm.v}()» non è supportato`);arity(m,ar.length,nm.v);a={t:'meth',obj:a,name:nm.v,args:ar};}
+          continue;}
+        if(a.t==='mod'&&MCONST[a.name]&&MCONST[a.name][nm.v]!==undefined){a={t:'mconst',mod:a.name,name:nm.v};continue;}
+        throw new SynErr(`«.${nm.v}» va usato come chiamata, per esempio .${nm.v}()`);}
+      if(isOp('(')) throw new SynErr('questo valore non si può chiamare come una funzione');
+      break;
+    }
+    if(a.t==='mod') throw new SynErr(`«${a.name}» è un modulo: usalo come ${a.name}.funzione(...)`);
+    return a;
+  }
+  function atom(){
+    const k=t[p++];
+    if(k.k==='num') return {t:'const',v:k.fl?new Fl(k.v):k.v};
+    if(k.k==='str') return {t:'const',v:k.v};
+    if(k.k==='fstr') return parseF(k.raw);
+    if(k.k==='id'){
+      const n=k.v;
+      if(n==='True') return {t:'const',v:true};
+      if(n==='False') return {t:'const',v:false};
+      if(n==='None') return {t:'const',v:null};
+      if(['true','false','vero','falso','none'].includes(n)) throw new SynErr(`in Python si scrive ${n==='none'?'None':(n==='true'||n==='vero')?'True':'False'} (con la maiuscola)`);
+      if(n==='math'||n==='random') return {t:'mod',name:n};
+      if(isOp('(')){
+        if(n==='print') throw new SynErr('per stampare usa il blocco Output');
+        if(n==='input') throw new SynErr('per leggere un valore usa il blocco Input');
+        if(n==='range') throw new SynErr('range() si usa nel blocco Per (for)');
+        p++;const ar=args(')');const f=BI[n];
+        if(!f) throw new SynErr(MODS.math[n]?`scrivi math.${n}(...)`:MODS.random[n]?`scrivi random.${n}(...)`:`funzione sconosciuta «${n}()»`);
+        arity(f,ar.length,n);return {t:'call',f:n,args:ar};
+      }
+      if(KEYWORDS.has(n)) throw new SynErr(`«${n}» è una parola riservata di Python e non può stare qui`);
+      return {t:'var',name:n};
+    }
+    if(k.k==='op'&&k.v==='('){if(isOp(')')) throw new SynErr('le tuple () non sono supportate');const e=or();if(isOp(',')) throw new SynErr('le tuple non sono supportate');expect(')');return e;}
+    if(k.k==='op'&&k.v==='[') return {t:'list',items:args(']')};
+    if(k.k==='eof') throw new SynErr('espressione incompleta');
+    throw new SynErr(`non mi aspettavo ${desc(k)}`);
+  }
+  if(mode==='list'){
+    if(t[p].k==='eof') return {t:'args',items:[]};
+    const items=[or()];while(isOp(',')){p++;items.push(or());}
+    if(t[p].k!=='eof') throw new SynErr(`non mi aspettavo ${desc(t[p])}`);
+    return {t:'args',items};
+  }
+  if(t[p].k==='eof') throw new SynErr('campo vuoto');
+  const e=or();
+  if(t[p].k!=='eof') throw new SynErr(isOp(',')?'qui va un solo valore: la virgola non è ammessa':`non mi aspettavo ${desc(t[p])}`);
+  return e;
+}
+function parseF(raw){
+  const parts=[];let lit='',i=0;
+  const flush=()=>{if(lit){parts.push(unescape(lit));lit='';}};
+  while(i<raw.length){
+    const c=raw[i];
+    if(c==='{'&&raw[i+1]==='{'){lit+='{';i+=2;continue;}
+    if(c==='}'&&raw[i+1]==='}'){lit+='}';i+=2;continue;}
+    if(c==='}') throw new SynErr('f-string: «}» senza la «{» corrispondente');
+    if(c==='{'){
+      flush();let j=i+1,depth=0,q=null;
+      for(;j<raw.length;j++){const d=raw[j];if(q){if(d===q) q=null;continue;}if(d==='"'||d==="'"){q=d;continue;}if('([{'.includes(d)) depth++;else if(d===')'||d===']') depth--;else if(d==='}'){if(depth===0) break;depth--;}}
+      if(j>=raw.length) throw new SynErr('f-string: manca «}»');
+      const inner=raw.slice(i+1,j);let k=-1;
+      {let dd=0,qq=null;for(let m=0;m<inner.length;m++){const d=inner[m];if(qq){if(d===qq) qq=null;continue;}if(d==='"'||d==="'"){qq=d;continue;}if('([{'.includes(d)) dd++;else if(')]}'.includes(d)) dd--;else if(d===':'&&dd===0){k=m;break;}}}
+      const exprSrc=k<0?inner:inner.slice(0,k),spec=k<0?'':inner.slice(k+1);
+      if(!exprSrc.trim()) throw new SynErr('f-string: le graffe {} sono vuote');
+      if(spec&&!SPECRE.test(spec)) throw new SynErr(`f-string: il formato «:${spec}» non è supportato (prova :.2f)`);
+      let e;try{e=parseInner(exprSrc,'expr');}catch(er){throw new SynErr('f-string, dentro {}: '+er.message);}
+      parts.push({e,spec});i=j+1;continue;
+    }
+    lit+=c;i++;
+  }
+  flush();return {t:'fstr',parts};
+}
+function fmtSpec(x,spec){
+  if(!spec) return pyStr(x);
+  const [,al,w,prec,ty]=SPECRE.exec(spec);let s;
+  if(prec!==undefined||ty==='f'){needNum(x,'il formato :.f');s=nv(x).toFixed(prec!==undefined?+prec:6);}
+  else if(ty==='d'){if(typeof x!=='number') throw new RunErr(`il formato :d vuole un int, non ${pyType(x)}`);s=String(x);}
+  else s=pyStr(x);
+  if(w){const Wd=+w,align=al||(isNum(x)?'>':'<');if(s.length<Wd){const pad=Wd-s.length;s=align==='>'?' '.repeat(pad)+s:align==='<'?s+' '.repeat(pad):' '.repeat(pad>>1)+s+' '.repeat(pad-(pad>>1));}}
+  return s;
+}
+
+/* ---------- evaluation ---------- */
+let vars=new Map();
+function nameErr(n){
+  let m=`la variabile «${n}» non esiste ancora: prima devi darle un valore (con Assegna, Input o un ciclo for)`;
+  for(const k of vars.keys()) if(k.toLowerCase()===n.toLowerCase()){m+=`. Forse intendevi «${k}»? In Python maiuscole e minuscole contano`;break;}
+  return new RunErr(m);
+}
+function ev(a){
+  switch(a.t){
+    case 'const': return a.v;
+    case 'var': if(!vars.has(a.name)) throw nameErr(a.name);return vars.get(a.name);
+    case 'list': return a.items.map(ev);
+    case 'idx': return getitem(ev(a.a),ev(a.i));
+    case 'mconst': return MCONST[a.mod][a.name];
+    case 'call': return BI[a.f][2](a.args.map(ev));
+    case 'mcall': return MODS[a.mod][a.f][2](a.args.map(ev));
+    case 'meth': {const o=ev(a.obj);return callMethod(o,a.name,a.args.map(ev));}
+    case 'un': {const x=ev(a.a);if(a.op==='not') return !truthy(x);if(!isNum(x)) throw new RunErr(`non posso usare il segno «${a.op}» davanti a un ${pyType(x)}`);return mk(a.op==='-'?-nv(x):nv(x),isF(x));}
+    case 'and': {const x=ev(a.a);return truthy(x)?ev(a.b):x;}
+    case 'or': {const x=ev(a.a);return truthy(x)?x:ev(a.b);}
+    case 'bin': return binop(a.op,ev(a.a),ev(a.b));
+    case 'cmp': {let x=ev(a.items[0]);
+      for(let k=0;k<a.ops.length;k++){const y=ev(a.items[k+1]),op=a.ops[k];let r;
+        if(op==='==') r=pyEq(x,y);else if(op==='!=') r=!pyEq(x,y);
+        else if(op==='in') r=contains(y,x,op);else if(op==='not in') r=!contains(y,x,op);
+        else{const c=pyOrder(x,y,op);r=op==='<'?c<0:op==='>'?c>0:op==='<='?c<=0:c>=0;}
+        if(!r) return false;x=y;}
+      return true;}
+    case 'fstr': return a.parts.map(q=>typeof q==='string'?q:fmtSpec(ev(q.e),q.spec)).join('');
+  }
+}
+function setTarget(a,val){
+  if(a.t==='var'){vars.set(a.name,val);return;}
+  setitem(ev(a.a),ev(a.i),val);
+}
+function rangeArgs(n){const s=n.start.trim()||'0',e=n.stop.trim()||'…',st=n.step.trim()||'1';if(st!=='1') return `${s}, ${e}, ${st}`;if(s==='0') return e;return `${s}, ${e}`;}
+
+function nodeErrors(n){
+  const errs=[];
+  const ex=(src,l,mode)=>{try{parse(src,mode);}catch(e){errs.push(`${l}: ${e.message}`);}};
+  const tg=(src,l)=>{try{const a=parse(src);if(a.t!=='var'&&a.t!=='idx') errs.push(`${l}: deve essere il nome di una variabile (es. n) o un elemento di lista (es. voti[i])`);}catch(e){errs.push(`${l}: ${e.message}`);}};
+  switch(n.t){
+    case 'assign': if(n.target.trim()) tg(n.target,'Variabile');ex(n.expr,'Valore');break;
+    case 'input': tg(n.target,'Variabile');if(n.msg.trim()) ex(n.msg,'Messaggio');break;
+    case 'output': ex(n.expr,'Cosa stampare','list');break;
+    case 'if':case 'while':case 'do': ex(n.cond,'Condizione');break;
+    case 'for':{const v=n.v.trim();if(!IDRE.test(v)||KEYWORDS.has(v)||v==='math'||v==='random') errs.push('Variabile: scrivi il nome di una variabile, es. i');
+      if(n.start.trim()) ex(n.start,'Inizio');ex(n.stop,'Fine');if(n.step.trim()) ex(n.step,'Passo');break;}
+  }
+  return errs;
+}
+
+/* ---------- python line for a block ---------- */
+function pyHead(n){
+  switch(n.t){
+    case 'assign': return n.target.trim()?`${n.target.trim()} = ${n.expr.trim()}`:n.expr.trim();
+    case 'input':{const inner=`input(${n.msg.trim()})`;return `${n.target.trim()} = ${n.vtype==='str'?inner:`${n.vtype}(${inner})`}`;}
+    case 'output':{const a=n.expr.trim();return `print(${a}${n.nl?'':(a?', end=""':'end=""')})`;}
+    case 'if': return `if ${n.cond.trim()}:`;
+    case 'while': return `while ${n.cond.trim()}:`;
+    case 'do': return `while True:   …   if not (${n.cond.trim()}): break`;
+    case 'for': return `for ${n.v.trim()} in range(${rangeArgs(n)}):`;
+    case 'comment': return `# ${n.text}`;
+  }
+}
+
+/* ---------- layout & drawing ---------- */
+const svg=$('#chart'), scroller=$('#scroller');
+const G=34,BH=40;
+const mctx=document.createElement('canvas').getContext('2d');
+const F_KW='600 13px "IBM Plex Sans", system-ui, sans-serif', F_TX='13px "IBM Plex Mono", ui-monospace, monospace';
+function tw(p){let w=0;for(const [t,k] of p){mctx.font=k?F_KW:F_TX;w+=mctx.measureText(t).width;}return Math.ceil(w);}
+const ph=s=>(s&&String(s).trim())?String(s).trim():'…';
+function parts(n){
+  let p;
+  switch(n.t){
+    case 'assign': p=[[n.target.trim()?`${n.target.trim()} = ${ph(n.expr)}`:ph(n.expr),0]];break;
+    case 'input': p=[['Input ',1],[ph(n.target),0],['  '+n.vtype,1]];break;
+    case 'output': p=[['Output ',1],[n.expr.trim()||'(riga vuota)',0]];if(!n.nl) p.push(['  senza a capo',1]);break;
+    case 'if':case 'while':case 'do': p=[[ph(n.cond),0]];break;
+    case 'for': p=[['for ',1],[ph(n.v),0],[' in ',1],[`range(${rangeArgs(n)})`,0]];break;
+    case 'comment': p=[[ph(n.text),0]];break;
+  }
+  return p.map(([t,k])=>[t.replace(/ /g,NB),k]);
+}
+function layNode(n){
+  const p=parts(n),w=tw(p);
+  switch(n.t){
+    case 'if':{const DW=Math.max(w+64,120),DH=50,ly=laySeq(n.no),ry=laySeq(n.yes);
+      const rx=Math.max(DW/2+18,ry.L+16),lx=Math.max(DW/2+18,ly.R+16),Hb=Math.max(ly.H,ry.H),yJ=DH/2+Hb+10;
+      return {p,DW,DH,ly,ry,lx,rx,yJ,L:Math.max(lx+ly.L,DW/2),R:Math.max(rx+ry.R,DW/2),H:yJ+8};}
+    case 'while':case 'for':{const hex=n.t==='for',DW=hex?Math.max(w+48,120):Math.max(w+64,120),DH=hex?42:50,T=16,B=laySeq(n.body);
+      const lx=Math.max(DW/2,B.L)+26,rx=Math.max(DW/2,B.R)+26,yLoop=T+DH+B.H+10,yExit=yLoop+16;
+      return {p,DW,DH,T,B,lx,rx,yLoop,yExit,L:lx,R:rx,H:yExit+6};}
+    case 'do':{const DW=Math.max(w+64,120),DH=50,T=16,B=laySeq(n.body),lx=Math.max(DW/2,B.L)+26;
+      return {p,DW,DH,T,B,lx,L:lx,R:Math.max(DW/2,B.R),H:T+B.H+DH+16};}
+    default:{const sk=(n.t==='input'||n.t==='output')?12:0,Wd=Math.max(w+32+sk*2,120);
+      return {p,Wd,sk,L:Wd/2,R:Wd/2,H:BH};}
+  }
+}
+function laySeq(arr){const items=arr.map(layNode);let L=14,R=14,H=G;for(const it of items){L=Math.max(L,it.L);R=Math.max(R,it.R);H+=it.H+G;}return {items,L,R,H};}
+
+const ln=(x1,y1,x2,y2)=>`<path class="fl" d="M${x1} ${y1}L${x2} ${y2}"/>`;
+const pl=pts=>`<path class="fl" d="M${pts.map(p=>p.join(' ')).join('L')}"/>`;
+const ahD=(x,y)=>`<path class="ah" d="M${x-5} ${y-8}L${x+5} ${y-8}L${x} ${y}Z"/>`;
+const ahR=(x,y)=>`<path class="ah" d="M${x-8} ${y-5}L${x-8} ${y+5}L${x} ${y}Z"/>`;
+const jn=(x,y)=>`<circle class="jn" cx="${x}" cy="${y}" r="3.5"/>`;
+const lbl=(x,y,t,a)=>`<text class="lbl" x="${x}" y="${y}" text-anchor="${a}">${t}</text>`;
+const txt=(cx,cy,p)=>`<text class="tx" x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central">${p.map(([t,k])=>`<tspan${k?' class="kw"':''}>${esc(t)}</tspan>`).join('')}</text>`;
+const diamond=(cx,y,w,h)=>`<path class="sh" d="M${cx} ${y}L${cx+w/2} ${y+h/2}L${cx} ${y+h}L${cx-w/2} ${y+h/2}Z"/>`;
+const hexa=(cx,y,w,h)=>`<path class="sh" d="M${cx-w/2} ${y+h/2}L${cx-w/2+14} ${y}L${cx+w/2-14} ${y}L${cx+w/2} ${y+h/2}L${cx+w/2-14} ${y+h}L${cx-w/2+14} ${y+h}Z"/>`;
+const insDot=(x,y,k)=>`<g class="ins" data-ins="${k}" tabindex="0" role="button" aria-label="Inserisci un blocco qui"><circle class="ins-hit" cx="${x}" cy="${y}" r="12"/><circle class="ins-dot" cx="${x}" cy="${y}" r="6.5"/><path class="ins-plus" d="M${x-3.5} ${y}H${x+3.5}M${x} ${y-3.5}V${y+3.5}"/></g>`;
+const LOOPTOP=new Set(['while','for','do']);
+const plain=p=>p.map(x=>x[0]).join('').replace(/ /g,' ');
+
+let reg={ins:[],nodes:{}};
+function grp(n,inner,p){
+  const errs=nodeErrors(n);
+  return `<g class="blk k-${n.t}${errs.length?' bad':''}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(ED[n.t].title+': '+plain(p))}">${errs.length?`<title>${esc(errs.join('\n'))}</title>`:''}${inner}</g>`;
+}
+function drawSeq(arr,lay,ax,y,o,arrowLast){
+  for(let i=0;i<=arr.length;i++){
+    const last=i===arr.length,nx=arr[i];
+    o.push(ln(ax,y,ax,y+G));
+    if((!last&&!LOOPTOP.has(nx.t))||(last&&arrowLast)) o.push(ahD(ax,y+G));
+    if(!exporting){reg.ins.push({arr,i});o.push(insDot(ax,y+G/2-2,reg.ins.length-1));}
+    y+=G;
+    if(!last){drawNode(nx,lay.items[i],ax,y,o,arr);y+=lay.items[i].H;}
+  }
+  return y;
+}
+function drawNode(n,L,ax,y,o,arr){
+  reg.nodes[n.id]={n,arr};
+  switch(n.t){
+    case 'if':{const {DW,DH,ly,ry,lx,rx,yJ}=L,cy=y+DH/2;
+      o.push(ln(ax+DW/2,cy,ax+rx,cy),ln(ax-DW/2,cy,ax-lx,cy));
+      o.push(lbl(ax+DW/2+6,cy-6,'True','start'),lbl(ax-DW/2-6,cy-6,'False','end'));
+      const ye=drawSeq(n.yes,ry,ax+rx,cy,o,false);o.push(ln(ax+rx,ye,ax+rx,y+yJ));
+      const yf=drawSeq(n.no,ly,ax-lx,cy,o,false);o.push(ln(ax-lx,yf,ax-lx,y+yJ));
+      o.push(ln(ax-lx,y+yJ,ax+rx,y+yJ),ln(ax,y+yJ,ax,y+L.H),jn(ax,y+yJ));
+      o.push(grp(n,diamond(ax,y,DW,DH)+txt(ax,cy,L.p),L.p));break;}
+    case 'while':case 'for':{const {DW,DH,T,B,lx,rx,yLoop,yExit}=L,top=y+T,cy=top+DH/2,f=n.t==='for';
+      o.push(ln(ax,y,ax,top),ahD(ax,top));
+      const yb=drawSeq(n.body,B,ax,top+DH,o,false);
+      o.push(pl([[ax,yb],[ax,y+yLoop],[ax-lx,y+yLoop],[ax-lx,y+T/2],[ax-1,y+T/2]]),ahR(ax,y+T/2));
+      o.push(pl([[ax+DW/2,cy],[ax+rx,cy],[ax+rx,y+yExit],[ax,y+yExit]]),ln(ax,y+yExit,ax,y+L.H),jn(ax,y+yExit));
+      o.push(lbl(ax+12,top+DH+12,f?'Prossimo':'True','start'),lbl(ax+DW/2+5,cy-6,f?'Fatto':'False','start'));
+      o.push(grp(n,(f?hexa(ax,top,DW,DH):diamond(ax,top,DW,DH))+txt(ax,cy,L.p),L.p));break;}
+    case 'do':{const {DW,DH,T,B,lx}=L;
+      o.push(ln(ax,y,ax,y+T));
+      const yd=drawSeq(n.body,B,ax,y+T,o,true),cy=yd+DH/2;
+      o.push(pl([[ax-DW/2,cy],[ax-lx,cy],[ax-lx,y+T/2],[ax-1,y+T/2]]),ahR(ax,y+T/2),ln(ax,yd+DH,ax,y+L.H));
+      o.push(lbl(ax-DW/2-6,cy-6,'True','end'),lbl(ax+12,yd+DH+12,'False','start'));
+      o.push(grp(n,diamond(ax,yd,DW,DH)+txt(ax,cy,L.p),L.p));break;}
+    default:{const {Wd,sk}=L,x=ax-Wd/2;let s;
+      if(n.t==='input'||n.t==='output') s=`<path class="sh" d="M${x+sk} ${y}L${x+Wd} ${y}L${x+Wd-sk} ${y+BH}L${x} ${y+BH}Z"/>`;
+      else if(n.t==='comment') s=`<path class="sh" d="M${x} ${y}H${x+Wd-10}L${x+Wd} ${y+10}V${y+BH}H${x}Z"/><path class="sh2" d="M${x+Wd-10} ${y}V${y+10}H${x+Wd}"/>`;
+      else s=`<rect class="sh" x="${x}" y="${y}" width="${Wd}" height="${BH}" rx="2"/>`;
+      o.push(grp(n,s+txt(ax,y+BH/2,L.p),L.p));}
+  }
+}
+let CW=400,CH=400,zoom=1;
+let exporting=false;
+function buildMarkup(){
+  reg={ins:[],nodes:{}};
+  const lay=laySeq(prog.body),OW=128,OH=38,M=36;
+  const Lx=Math.max(lay.L,OW/2),Rx=Math.max(lay.R,OW/2)+20;
+  const ax=Math.round(M+Lx);let y=M;const o=[];
+  const oval=(t,id)=>`<g class="sys" data-id="${id}"><rect class="sh" x="${ax-OW/2}" y="${y}" width="${OW}" height="${OH}" rx="${OH/2}"/>${txt(ax,y+OH/2,[[t,0]])}</g>`;
+  o.push(oval('Inizio','start'));y+=OH;
+  y=drawSeq(prog.body,lay,ax,y,o,true);
+  o.push(oval('Fine','end'));y+=OH;
+  return {inner:o.join(''),W:Math.ceil(ax+Rx+M),H:Math.ceil(y+M)};
+}
+function render(){
+  const r=buildMarkup();CW=r.W;CH=r.H;
+  svg.setAttribute('viewBox',`0 0 ${CW} ${CH}`);
+  svg.innerHTML=r.inner;
+  applyZoom();
+  if(run.cur&&busy()) paintCur();
+}
+function applyZoom(){svg.style.width=CW*zoom+'px';svg.style.height=CH*zoom+'px';$('#zLbl').textContent=Math.round(zoom*100)+'%';}
+$('#zIn').onclick=()=>{zoom=Math.min(2,+(zoom+.1).toFixed(2));applyZoom();};
+$('#zOut').onclick=()=>{zoom=Math.max(.4,+(zoom-.1).toFixed(2));applyZoom();};
+$('#zFit').onclick=()=>{zoom=Math.max(.4,Math.min(1.5,(scroller.clientWidth-8)/CW,(scroller.clientHeight-8)/CH));zoom=+zoom.toFixed(2);applyZoom();};
+
+/* ---------- history & storage ---------- */
+const KEY='flussogramma.py.v1';
+let undoS=[],redoS=[];
+const snap=()=>JSON.stringify({body:prog.body});
+function pushUndo(s){undoS.push(s);if(undoS.length>150) undoS.shift();redoS=[];}
+function restore(s){const p=JSON.parse(s);prog={body:sanitize(p.body)};}
+function save(){try{localStorage.setItem(KEY,snap());}catch(e){}}
+function changed(){render();save();updCode();updUndo();}
+function updUndo(){$('#btnUndo').disabled=!undoS.length||busy();$('#btnRedo').disabled=!redoS.length||busy();}
+function undo(){if(!undoS.length||busy()) return;redoS.push(snap());restore(undoS.pop());resetMarks();changed();}
+function redo(){if(!redoS.length||busy()) return;undoS.push(snap());restore(redoS.pop());resetMarks();changed();}
+$('#btnUndo').onclick=undo;$('#btnRedo').onclick=redo;
+
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600);}
+
+const exSel=$('#examples');
+exSel.innerHTML='<option value="" selected disabled>Esempi…</option>'+EXAMPLES.map((e,i)=>`<option value="${i}">${esc(e.name)}</option>`).join('');
+exSel.onchange=()=>{const e=EXAMPLES[+exSel.value];exSel.value='';if(!e) return;if(busy()) stopRun(true);pushUndo(snap());prog={body:e.build()};resetMarks();changed();toast(`Caricato «${e.name}». Annulla per tornare indietro.`);};
+$('#btnNew').onclick=()=>{if(busy()) stopRun(true);pushUndo(snap());prog={body:[]};resetMarks();changed();toast('Nuovo diagramma. Annulla per recuperare quello di prima.');};
+
+/* ---------- insert menu ---------- */
+const menu=$('#menu'),wrap=$('#wrap');
+const MENU=[['Istruzioni',[['assign','Assegna'],['input','Input'],['output','Output'],['comment','Commento']]],['Controllo',[['if','Se (if)'],['while','Mentre (while)'],['for','Per (for)'],['do','Ripeti… mentre']]]];
+function swatch(t){
+  let s;
+  switch(t){
+    case 'input':case 'output': s='<path class="sh" d="M5 2H29L25 16H1Z"/>';break;
+    case 'if':case 'while':case 'do': s='<path class="sh" d="M15 1L28 9L15 17L2 9Z"/>';break;
+    case 'for': s='<path class="sh" d="M2 9L7 2H23L28 9L23 16H7Z"/>';break;
+    case 'comment': s='<path class="sh" d="M2 2H23L28 7V16H2Z"/>';break;
+    case 'paste': return '<svg viewBox="0 0 30 18" aria-hidden="true"><rect x="9" y="2" width="12" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M12 2V1H18V2" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>';
+    default: s='<rect class="sh" x="2" y="2" width="26" height="14" rx="1.5"/>';
+  }
+  return `<svg viewBox="0 0 30 18" class="k-${t}" aria-hidden="true">${s}</svg>`;
+}
+let menuK=null,clip=null;
+function openMenu(k,el){
+  menuK=k;
+  svg.querySelectorAll('.ins.open').forEach(e=>e.classList.remove('open'));el.classList.add('open');
+  let h='';
+  for(const [g,items] of MENU){h+=`<h3>${g}</h3><div class="mgrid">`+items.map(([t,l])=>`<button type="button" class="mi" role="menuitem" data-t="${t}">${swatch(t)}<span>${l}</span></button>`).join('')+(g==='Controllo'&&clip?`<button type="button" class="mi" role="menuitem" data-t="paste">${swatch('paste')}<span>Incolla</span></button>`:'')+'</div>';}
+  menu.innerHTML=h;menu.hidden=false;
+  const wr=wrap.getBoundingClientRect(),ar=el.getBoundingClientRect();
+  let left=ar.right-wr.left+10,top=ar.top-wr.top-12;
+  const mw=menu.offsetWidth,mh=menu.offsetHeight;
+  if(left+mw>wr.width-8) left=ar.left-wr.left-mw-10;
+  left=Math.max(8,Math.min(left,wr.width-mw-8));top=Math.max(8,Math.min(top,wr.height-mh-8));
+  menu.style.left=left+'px';menu.style.top=top+'px';
+  menu.querySelector('.mi').focus();
+}
+function closeMenu(){menu.hidden=true;menuK=null;svg.querySelectorAll('.ins.open').forEach(e=>e.classList.remove('open'));}
+menu.addEventListener('click',e=>{
+  const b=e.target.closest('.mi');if(!b||menuK==null) return;
+  const {arr,i}=reg.ins[menuK];closeMenu();
+  const before=snap();
+  if(b.dataset.t==='paste'){const n=sanitize([JSON.parse(clip)])[0];pushUndo(before);arr.splice(i,0,n);changed();return;}
+  const n=make(b.dataset.t);arr.splice(i,0,n);render();openEditor(n,before,true);
+});
+document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!menu.contains(e.target)&&!e.target.closest('.ins')) closeMenu();});
+
+svg.addEventListener('click',e=>activate(e.target));
+svg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(e.target);}});
+function activate(t){
+  const ins=t.closest('.ins');
+  if(ins){if(busy()) return;openMenu(+ins.dataset.ins,ins);return;}
+  const b=t.closest('.blk');if(!b) return;
+  const r=reg.nodes[b.dataset.id];if(!r) return;
+  if(busy()){toast('Ferma l\'esecuzione (Stop) per modificare il diagramma.');return;}
+  if(run.state==='done'||run.state==='error') resetMarks();
+  openEditor(r.n,snap(),false);
+}
+
+/* ---------- editor ---------- */
+const ED={
+  assign:{title:'Assegna',desc:'Calcola il valore e lo mette nella variabile. Se la variabile non esiste ancora, viene creata, come in Python. Lascia vuota la Variabile per un\'istruzione come lista.append(x).',fields:[['target','Variabile','text','es. somma'],['expr','Valore','text','es. somma + i']]},
+  input:{title:'Input',desc:'Il programma si ferma, l\'utente digita un valore e il valore, convertito nel tipo scelto, finisce nella variabile.',fields:[['target','Variabile','text','es. n'],['vtype','Tipo di dato','vt'],['msg','Messaggio (facoltativo)','text','es. "Inserisci n: "']]},
+  output:{title:'Output',desc:'Stampa nella console, come print(). Separa più valori con la virgola: vengono stampati con uno spazio in mezzo.',fields:[['expr','Cosa stampare','text','es. "La somma è", somma'],['nl','Vai a capo alla fine','check']]},
+  if:{title:'Se (if)',desc:'Se la condizione è vera esegue il ramo True (a destra), altrimenti il ramo False (a sinistra).',fields:[['cond','Condizione','text','es. n % 2 == 0']]},
+  while:{title:'Mentre (while)',desc:'Controlla la condizione e, finché è vera, ripete i blocchi interni.',fields:[['cond','Condizione','text','es. n > 0']]},
+  for:{title:'Per (for)',desc:'Come for … in range() di Python: il contatore parte da Inizio e si ferma prima di Fine. Per contare da 1 a 10 scrivi Inizio 1 e Fine 11.',fields:[['v','Variabile contatore','text','es. i'],['start','Inizio','short','0'],['stop','Fine (esclusa)','short','10'],['step','Passo','short','1']]},
+  do:{title:'Ripeti… mentre',desc:'Esegue i blocchi interni almeno una volta, poi li ripete finché la condizione è vera. In Python diventa while True con break.',fields:[['cond','Condizione','text','es. tentativo != segreto']]},
+  comment:{title:'Commento',desc:'Una nota per chi legge il diagramma. Non viene eseguita.',fields:[['text','Testo','text','es. calcolo la media']]}
+};
+const edScrim=$('#edScrim'),edForm=$('#edForm'),edErr=$('#edErr');
+let ed=null;
+function fieldHTML([k,label,kind,ph],n){
+  const id='f_'+k;
+  if(kind==='check') return `<div class="fld chk" id="w_${k}"><input type="checkbox" id="${id}"${n[k]?' checked':''}><label for="${id}">${label}</label></div>`;
+  if(kind==='vt') return `<div class="fld" id="w_${k}"><label for="${id}">${label}</label><select id="${id}">${Object.entries(VTL).map(([v,l])=>`<option value="${v}"${n[k]===v?' selected':''}>${v} — ${l}</option>`).join('')}</select></div>`;
+  return `<div class="fld" id="w_${k}"><label for="${id}">${label}</label><input type="text" id="${id}" value="${esc(n[k])}" placeholder="${esc(ph||'')}" spellcheck="false" autocapitalize="off" autocomplete="off"></div>`;
+}
+function readFields(n){for(const [k,,kind] of ED[n.t].fields){const el=$('#f_'+k);if(!el) continue;n[k]=kind==='check'?el.checked:el.value;}}
+function updPreview(){if(!ed) return;const tmp=JSON.parse(JSON.stringify(ed.n));readFields(tmp);$('#edPy').textContent=pyHead(tmp);}
+function openEditor(n,before,isNew){
+  closeMenu();
+  ed={n,before,isNew};
+  const d=ED[n.t];
+  $('#edTitle').innerHTML=swatch(n.t)+esc(d.title);
+  $('#edDesc').textContent=d.desc;
+  let h='',short=[];
+  for(const f of d.fields){if(f[2]==='short'){short.push(f);continue;}h+=fieldHTML(f,n);}
+  if(short.length) h+=`<div class="row3">${short.map(f=>fieldHTML(f,n)).join('')}</div>`;
+  $('#edFields').innerHTML=h;
+  edErr.hidden=true;
+  $('#edDel').hidden=$('#edCopy').hidden=$('#edCut').hidden=isNew;
+  updPreview();
+  edScrim.hidden=false;
+  const first=edForm.querySelector('input[type=text],select');first&&first.focus();
+}
+edForm.addEventListener('input',updPreview);edForm.addEventListener('change',updPreview);
+function closeEditor(){edScrim.hidden=true;ed=null;}
+function cancelEditor(){if(!ed) return;if(ed.isNew){restore(ed.before);render();}closeEditor();}
+edForm.onsubmit=e=>{
+  e.preventDefault();if(!ed) return;
+  const tmp=JSON.parse(JSON.stringify(ed.n));readFields(tmp);
+  const errs=nodeErrors(tmp);
+  if(errs.length){edErr.innerHTML=errs.map(x=>`<div>${esc(x)}</div>`).join('');edErr.hidden=false;return;}
+  readFields(ed.n);
+  if(ed.isNew||snap()!==ed.before) pushUndo(ed.before);
+  closeEditor();changed();
+};
+$('#edCancel').onclick=cancelEditor;
+edScrim.addEventListener('pointerdown',e=>{if(e.target===edScrim) cancelEditor();});
+function removeNode(n){const r=reg.nodes[n.id];if(!r) return;const i=r.arr.indexOf(n);if(i>=0) r.arr.splice(i,1);}
+$('#edDel').onclick=()=>{if(!ed) return;pushUndo(ed.before);removeNode(ed.n);closeEditor();changed();toast('Blocco eliminato.');};
+$('#edCopy').onclick=()=>{if(!ed) return;clip=JSON.stringify(ed.n);closeEditor();toast('Blocco copiato: clicca un + e scegli Incolla.');};
+$('#edCut').onclick=()=>{if(!ed) return;clip=JSON.stringify(ed.n);pushUndo(ed.before);removeNode(ed.n);closeEditor();changed();toast('Blocco tagliato: clicca un + e scegli Incolla.');};
+
+/* ---------- save / open ---------- */
+const ioScrim=$('#ioScrim'),ioText=$('#ioText'),ioErr=$('#ioErr');
+$('#btnIO').onclick=()=>{ioText.value=JSON.stringify({app:'Flussogramma',lang:'python',version:2,body:JSON.parse(snap()).body},null,1);ioErr.hidden=true;ioScrim.hidden=false;ioText.focus();ioText.select();};
+$('#ioClose').onclick=()=>ioScrim.hidden=true;
+ioScrim.addEventListener('pointerdown',e=>{if(e.target===ioScrim) ioScrim.hidden=true;});
+$('#ioCopy').onclick=()=>{
+  const sel=()=>{ioText.select();toast('Testo selezionato: premi Ctrl+C.');};
+  try{navigator.clipboard.writeText(ioText.value).then(()=>toast('Testo copiato.'),sel);}catch(e){sel();}
+};
+$('#ioFile').onchange=e=>{const f=e.target.files[0];if(!f) return;const r=new FileReader();r.onload=()=>{ioText.value=r.result;loadFromText();};r.readAsText(f);e.target.value='';};
+function loadFromText(){
+  try{const p=JSON.parse(ioText.value);const body=Array.isArray(p)?p:p.body;if(!Array.isArray(body)) throw 0;
+    if(busy()) stopRun(true);
+    pushUndo(snap());prog={body:sanitize(body)};resetMarks();changed();ioScrim.hidden=true;toast('Diagramma aperto.');
+  }catch(e){ioErr.textContent='Il testo non è un diagramma valido. Controlla di averlo copiato per intero.';ioErr.hidden=false;}
+}
+$('#ioLoad').onclick=loadFromText;
+
+/* ---------- runner ---------- */
+const con=$('#console'),inForm=$('#inForm'),inField=$('#inField'),inBtn=$('#inBtn'),inLbl=$('#inLbl');
+let openLine=null;
+function conClear(){con.innerHTML='';openLine=null;}
+function conLine(t,cls){const d=document.createElement('div');d.className='ln '+cls;d.textContent=t;con.append(d);con.scrollTop=con.scrollHeight;return d;}
+function conOut(t,nl){if(openLine) openLine.append(t);else openLine=conLine(t,'out');if(nl) openLine=null;con.scrollTop=con.scrollHeight;}
+function conEcho(v){const sp=document.createElement('span');sp.className='echo';sp.textContent=v;(openLine||(openLine=conLine('','out'))).append(sp);openLine=null;con.scrollTop=con.scrollHeight;}
+$('#btnClear').onclick=()=>{conClear();};
+
+const run={state:'idle',gen:null,cur:null,curEl:null,waiting:null,timer:null,steps:0};
+const LIMIT=3e6;
+const busy=()=>run.state==='running'||run.state==='paused';
+const SPEEDS=[[0,'Istantanea'],[30,'Molto veloce'],[150,'Veloce'],[420,'Media'],[850,'Lenta'],[1500,'Molto lenta']];
+const speedEl=$('#speed');
+const delay=()=>SPEEDS[+speedEl.value][0];
+speedEl.oninput=()=>{$('#speedLbl').textContent=SPEEDS[+speedEl.value][1];};
+
+function parseInput(raw,type){
+  const s=raw.trim();
+  if(type==='int'){if(!/^[+-]?\d+$/.test(s)) return {err:`«${raw}» non si può convertire in int (numero intero). Riprova.`};return {v:parseInt(s,10)};}
+  if(type==='float'){if(/^[+-]?\d+,\d+$/.test(s)) return {err:`In Python i decimali si scrivono con il punto: ${s.replace(',','.')}. Riprova.`};if(!FLOATRE.test(s)) return {err:`«${raw}» non si può convertire in float (numero). Riprova.`};return {v:new Fl(parseFloat(s))};}
+  return {v:raw};
+}
+function* execSeq(arr){for(const s of arr) yield* execNode(s);}
+function* execNode(s){
+  if(s.t==='comment') return;
+  yield {id:s.id};
+  switch(s.t){
+    case 'assign':{const val=ev(parse(s.expr));if(s.target.trim()) setTarget(parse(s.target),val);break;}
+    case 'input':{
+      const tg=parse(s.target),msg=s.msg.trim()?pyStr(ev(parse(s.msg))):'';
+      for(;;){
+        if(msg) conOut(msg,false);
+        const raw=yield {input:true,node:s,label:s.target.trim(),vtype:s.vtype};
+        const r=parseInput(raw,s.vtype);
+        if(r.err){conLine(r.err,'err');continue;}
+        setTarget(tg,r.v);break;
+      }
+      break;}
+    case 'output': conOut(parse(s.expr,'list').items.map(x=>pyStr(ev(x))).join(' '),s.nl);break;
+    case 'if': yield* execSeq(truthy(ev(parse(s.cond)))?s.yes:s.no);break;
+    case 'while': while(truthy(ev(parse(s.cond)))){yield* execSeq(s.body);yield {id:s.id};}break;
+    case 'do': do{yield* execSeq(s.body);yield {id:s.id};}while(truthy(ev(parse(s.cond))));break;
+    case 'for':{
+      const nm=s.v.trim();
+      const a=s.start.trim()?ev(parse(s.start)):0,b=ev(parse(s.stop)),st=s.step.trim()?ev(parse(s.step)):1;
+      [a,b,st].forEach(x=>{if(!isIntLike(x)) throw new RunErr(`range() vuole numeri interi (int), ma ha ricevuto ${pyType(x)} ${repr(x)}`);});
+      const A0=nv(a),B0=nv(b),S0=nv(st);
+      if(S0===0) throw new RunErr('il passo di range() non può essere 0');
+      for(let i=A0;S0>0?i<B0:i>B0;i+=S0){vars.set(nm,i);yield* execSeq(s.body);yield {id:s.id};}
+      break;}
+  }
+}
+function* mainGen(){yield {id:'start'};yield* execSeq(prog.body);yield {id:'end'};}
+function paintCur(scroll){
+  if(run.curEl) run.curEl.classList.remove('cur');
+  run.curEl=run.cur?svg.querySelector(`[data-id="${run.cur}"]`):null;
+  if(run.curEl){run.curEl.classList.add('cur');
+    if(scroll){const r=run.curEl.getBoundingClientRect(),s=scroller.getBoundingClientRect();
+      if(r.top<s.top+20||r.bottom>s.bottom-20||r.left<s.left||r.right>s.right) run.curEl.scrollIntoView({block:'center',inline:'nearest',behavior:delay()>=400?'smooth':'auto'});}}
+}
+function resetMarksForce(){svg.querySelectorAll('.cur,.err').forEach(e=>e.classList.remove('cur','err'));run.cur=null;run.curEl=null;}
+function resetMarks(){if(busy()) return;resetMarksForce();if(run.state==='done'||run.state==='error') setState('idle');}
+function setState(s,label){
+  run.state=s;
+  const st=$('#status');
+  const map={idle:['idle','Pronto'],running:['running','In esecuzione'],paused:['idle','In pausa'],done:['idle','Terminato'],error:['error','Errore']};
+  const m=map[s];st.dataset.s=label==='input'?'input':m[0];st.textContent=label==='input'?'Attende un input':m[1];
+  document.body.classList.toggle('busy',busy());
+  $('#btnRun').querySelector('span').textContent=s==='running'?'Pausa':s==='paused'?'Continua':'Esegui';
+  $('#btnStop').disabled=!busy();
+  updUndo();
+}
+function prepare(){
+  closeMenu();
+  const bad=[];walk(prog.body,n=>{if(nodeErrors(n).length) bad.push(n);});
+  resetMarksForce();conClear();
+  if(bad.length){
+    conLine(`Non posso eseguire: ${bad.length===1?'un blocco ha':bad.length+' blocchi hanno'} un errore (bordo rosso tratteggiato). Clicca il blocco per correggerlo.`,'err');
+    selectTab('run');return false;
+  }
+  vars=new Map();prevSig=new Map();run.gen=mainGen();run.steps=0;run.waiting=null;
+  refreshVars();selectTab('run');
+  return true;
+}
+function stepOnce(val,paint){
+  try{
+    const r=run.gen.next(val);
+    if(r.done){finish();return 'done';}
+    const v=r.value;
+    if(v.input){run.cur=v.node.id;paintCur(true);askInput(v);return 'input';}
+    run.cur=v.id;if(paint) paintCur(true);
+    if(++run.steps>LIMIT) throw new RunErr('troppi passi eseguiti: forse c\'è un ciclo che non finisce mai');
+    return 'ok';
+  }catch(e){fail(e);return 'error';}
+}
+function loop(){
+  clearTimeout(run.timer);
+  if(run.state!=='running'||run.waiting) return;
+  const d=delay();
+  if(d===0){
+    const t0=performance.now();
+    while(performance.now()-t0<14){for(let k=0;k<400;k++){const s=stepOnce(undefined,false);if(s!=='ok'){refreshVars();return;}}}
+    paintCur(false);refreshVars();run.timer=setTimeout(loop,0);
+  }else{
+    const s=stepOnce(undefined,true);refreshVars();
+    if(s==='ok') run.timer=setTimeout(loop,d);
+  }
+}
+function askInput(v){
+  run.waiting=v;
+  setState(run.state,'input');
+  inForm.classList.add('waiting');
+  inLbl.textContent=`${v.label} = ${v.vtype==='str'?'input()':v.vtype+'(input())'}  ·  scrivi un ${VTL[v.vtype]}`;
+  inField.disabled=inBtn.disabled=false;inField.value='';
+  inField.placeholder=v.vtype==='int'?'es. 42':v.vtype==='float'?'es. 3.5':'testo';
+  refreshVars();selectTab('run');
+  setTimeout(()=>inField.focus(),0);
+}
+function endInput(){run.waiting=null;inForm.classList.remove('waiting');inLbl.textContent='Input: in attesa del programma';inField.disabled=inBtn.disabled=true;inField.placeholder='';}
+inForm.onsubmit=e=>{
+  e.preventDefault();if(!run.waiting) return;
+  const val=inField.value;conEcho(val);endInput();setState(run.state);
+  const s=stepOnce(val,true);refreshVars();
+  if(s==='ok'&&run.state==='running') run.timer=setTimeout(loop,delay());
+};
+function finish(){
+  clearTimeout(run.timer);endInput();
+  openLine=null;conLine('Programma terminato.','info');
+  setState('done');run.cur='end';paintCur(true);refreshVars();
+}
+function fail(e){
+  clearTimeout(run.timer);endInput();openLine=null;
+  const msg=e instanceof RunErr?e.message:'errore interno: '+(e&&e.message||e);
+  conLine('Errore: '+msg.charAt(0).toUpperCase()+msg.slice(1),'err');
+  setState('error');paintCur(true);if(run.curEl) run.curEl.classList.add('err');
+  refreshVars();
+}
+function stopRun(silent){
+  clearTimeout(run.timer);endInput();
+  if(busy()&&!silent){openLine=null;conLine('Esecuzione interrotta.','info');}
+  setState('idle');resetMarksForce();
+}
+$('#btnRun').onclick=()=>{
+  if(run.state==='running'){setState('paused',run.waiting?'input':undefined);clearTimeout(run.timer);return;}
+  if(run.state==='paused'){setState('running',run.waiting?'input':undefined);loop();return;}
+  if(!prepare()) return;setState('running');loop();
+};
+$('#btnStep').onclick=()=>{
+  if(run.state==='running'){setState('paused',run.waiting?'input':undefined);clearTimeout(run.timer);return;}
+  if(run.state!=='paused'){if(!prepare()) return;setState('paused');}
+  if(run.waiting){inField.focus();toast('Il programma aspetta un input: scrivilo nella console e premi Invia.');return;}
+  stepOnce(undefined,true);refreshVars();
+};
+$('#btnStop').onclick=()=>stopRun(false);
+
+/* ---------- variables ---------- */
+const varsBody=$('#varsBody');
+let prevSig=new Map();
+function refreshVars(){
+  if(!vars.size){varsBody.innerHTML='<tr><td colspan="3" class="empty">Le variabili compaiono qui quando ricevono il primo valore.</td></tr>';return;}
+  let h='';
+  for(const [k,v] of vars){
+    const sig=pyType(v)+':'+repr(v);
+    const chg=prevSig.has(k)&&prevSig.get(k)!==sig,isNew=!prevSig.has(k)&&run.steps>0;prevSig.set(k,sig);
+    const val=Array.isArray(v)?(v.length?`<div class="cells">${v.slice(0,200).map((x,i)=>`<span><i>${i}</i>${esc(repr(x))}</span>`).join('')}${v.length>200?'<span>…</span>':''}</div>`:'[]'):esc(repr(v));
+    h+=`<tr${chg||isNew?' class="chg"':''}><td class="nm">${esc(k)}</td><td class="ty">${pyType(v)}</td><td class="vl">${val}</td></tr>`;
+  }
+  varsBody.innerHTML=h;
+}
+
+/* ---------- code generation ---------- */
+let codeLang='python';
+function genPseudo(){
+  const L=['INIZIO'];const ind=d=>'    '.repeat(d);
+  const seq=(a,d)=>a.forEach(n=>node(n,d));
+  function node(n,d){const I=ind(d);
+    switch(n.t){
+      case 'assign': L.push(n.target.trim()?`${I}${n.target.trim()} ← ${n.expr.trim()}`:`${I}ESEGUI ${n.expr.trim()}`);break;
+      case 'input': if(n.msg.trim()) L.push(`${I}SCRIVI ${n.msg.trim()}`);L.push(`${I}LEGGI ${n.target.trim()}   (${VTL[n.vtype]})`);break;
+      case 'output': L.push(`${I}SCRIVI ${n.expr.trim()}`);break;
+      case 'if': L.push(`${I}SE ${n.cond.trim()} ALLORA`);seq(n.yes,d+1);if(n.no.length){L.push(`${I}ALTRIMENTI`);seq(n.no,d+1);}L.push(`${I}FINE SE`);break;
+      case 'while': L.push(`${I}MENTRE ${n.cond.trim()} ESEGUI`);seq(n.body,d+1);L.push(`${I}FINE MENTRE`);break;
+      case 'for':{const st=n.step.trim()||'1';L.push(`${I}PER ${n.v.trim()} DA ${n.start.trim()||'0'} FINO A ${n.stop.trim()} (escluso)${st!=='1'?` CON PASSO ${st}`:''} ESEGUI`);seq(n.body,d+1);L.push(`${I}FINE PER`);break;}
+      case 'do': L.push(`${I}RIPETI`);seq(n.body,d+1);L.push(`${I}MENTRE ${n.cond.trim()}`);break;
+      case 'comment': L.push(`${I}// ${n.text}`);break;
+    }}
+  seq(prog.body,1);L.push('FINE');return L.join('\n');
+}
+function genPython(){
+  const texts=[];walk(prog.body,n=>{for(const k of ['target','expr','msg','cond','start','stop','step']) if(n[k]) texts.push(n[k].replace(/(["'])(?:\\.|(?!\1).)*\1/g,'""'));});
+  const all=texts.join('\n'),head=[];
+  if(/\bmath\s*\./.test(all)) head.push('import math');
+  if(/\brandom\s*\./.test(all)) head.push('import random');
+  if(head.length) head.push('');
+  const L=[];const ind=d=>'    '.repeat(d);
+  const seq=(a,d)=>{const before=L.length;a.forEach(n=>node(n,d));if(L.length===before) L.push(ind(d)+'pass');};
+  function node(n,d){const I=ind(d);
+    switch(n.t){
+      case 'if':{L.push(I+pyHead(n));seq(n.yes,d+1);let e=n;
+        while(e.no.length===1&&e.no[0].t==='if'){e=e.no[0];L.push(`${I}el${pyHead(e)}`);seq(e.yes,d+1);}
+        if(e.no.length){L.push(`${I}else:`);seq(e.no,d+1);}break;}
+      case 'while':case 'for': L.push(I+pyHead(n));seq(n.body,d+1);break;
+      case 'do': L.push(`${I}while True:`);seq(n.body,d+1);L.push(`${I}    if not (${n.cond.trim()}):`,`${I}        break`);break;
+      default: L.push(I+pyHead(n));
+    }}
+  seq(prog.body,0);
+  return head.concat(L).join('\n');
+}
+function updCode(){$('#code').textContent=codeLang==='python'?genPython():genPseudo();}
+document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{codeLang=b.dataset.lang;document.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));updCode();});
+$('#btnCopyCode').onclick=()=>{
+  const txt=$('#code').textContent;
+  const sel=()=>{const r=document.createRange();r.selectNodeContents($('#code'));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Codice selezionato: premi Ctrl+C.');};
+  try{navigator.clipboard.writeText(txt).then(()=>toast('Codice copiato.'),sel);}catch(e){sel();}
+};
+
+
+/* ---------- export (PDF / PNG) ---------- */
+const EXPORT_CSS=`.fl{fill:none;stroke:#2e3d45;stroke-width:1.6;stroke-linejoin:round}.ah,.jn{fill:#2e3d45}
+.lbl{font:500 11px 'IBM Plex Sans',Arial,Helvetica,sans-serif;fill:#5a6a70}
+.tx{font:13px 'IBM Plex Mono','Courier New',Courier,monospace;fill:#17232b;white-space:pre}
+.tx .kw{font-family:'IBM Plex Sans',Arial,Helvetica,sans-serif;font-weight:600}
+.sys .tx{font:600 13px 'IBM Plex Sans',Arial,Helvetica,sans-serif}
+.sh{stroke-width:1.6}.sh2{fill:none;stroke-width:1.2}
+.sys .sh{fill:#ffffff;stroke:#2e3d45}
+.k-assign .sh{fill:#ffdcc0;stroke:#bd5612}.k-input .sh{fill:#d4e8fb;stroke:#2c6aa8}.k-output .sh{fill:#d4efd5;stroke:#2f7f3e}
+.k-if .sh{fill:#fcd6da;stroke:#b23a4a}.k-while .sh,.k-for .sh,.k-do .sh{fill:#e6dcfa;stroke:#6844b0}
+.k-comment .sh{fill:#eef0ee;stroke:#8a928f;stroke-dasharray:4 3}.k-comment .sh2{stroke:#8a928f}.k-comment .tx{font-style:italic;fill:#5a6a70}
+.bad .sh{stroke:#c4314b;stroke-dasharray:5 3;stroke-width:2.2}`;
+function exportSVG(){
+  const saved=reg;exporting=true;let r;
+  try{r=buildMarkup();}finally{exporting=false;reg=saved;}
+  const str=`<svg xmlns="http://www.w3.org/2000/svg" width="${r.W}" height="${r.H}" viewBox="0 0 ${r.W} ${r.H}"><style>${EXPORT_CSS}</style><rect width="100%" height="100%" fill="#ffffff"/>${r.inner}</svg>`;
+  return {str,W:r.W,H:r.H};
+}
+function rasterize({str,W,H}){
+  const k=Math.max(1,Math.min(3,Math.sqrt(60e6/(W*H)),16000/Math.max(W,H)));
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(new Blob([str],{type:'image/svg+xml'}));
+    const img=new Image();
+    img.onload=()=>{const c=document.createElement('canvas');c.width=Math.round(W*k);c.height=Math.round(H*k);
+      const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);res({canvas:c,k});};
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('impossibile disegnare il diagramma'));};
+    img.src=url;
+  });
+}
+let jspdfP=null;
+function loadJsPDF(){
+  if(window.jspdf) return Promise.resolve(window.jspdf);
+  const srcs=['vendor/jspdf.umd.min.js','https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'];
+  const tryLoad=i=>new Promise((res,rej)=>{if(i>=srcs.length){rej(new Error('jsPDF'));return;}
+    const sc=document.createElement('script');sc.src=srcs[i];
+    sc.onload=()=>window.jspdf?res(window.jspdf):tryLoad(i+1).then(res,rej);
+    sc.onerror=()=>{sc.remove();tryLoad(i+1).then(res,rej);};document.head.appendChild(sc);});
+  if(!jspdfP) jspdfP=tryLoad(0).catch(e=>{jspdfP=null;throw e;});
+  return jspdfP;
+}
+const L1={'←':'<-','…':'...','’':"'",'‘':"'",'“':'"','”':'"','–':'-','—':'-','≤':'<=','≥':'>=','·':'-','×':'x'};
+const latin1=s=>String(s).replace(/[^\x00-\xFF]/g,ch=>L1[ch]!==undefined?L1[ch]:'?');
+function bestCut(canvas,cy,take){
+  const lo=Math.floor(take*.72),h=take-lo,g=canvas.getContext('2d');
+  const d=g.getImageData(0,cy+lo,canvas.width,h).data,w=canvas.width;
+  let best=take,bestN=Infinity;
+  for(let r=h-1;r>=0;r--){let n=0;const off=r*w*4;for(let x=0;x<w;x++){const i=off+x*4;if(d[i]+d[i+1]+d[i+2]<735) n++;}if(n<bestN){bestN=n;best=lo+r;}if(n<=2) break;}
+  return Math.max(1,best);
+}
+async function makePDF(o){
+  const {jsPDF}=await loadJsPDF();
+  const ex=exportSVG(),{canvas,k}=await rasterize(ex),W=ex.W,H=ex.H;
+  const single=o.layout==='one';
+  const pdf=new jsPDF({orientation:single&&W>H*1.15?'landscape':'portrait',unit:'pt',format:o.page,compress:true});
+  const pw=pdf.internal.pageSize.getWidth(),ph=pdf.internal.pageSize.getHeight(),m=36,foot=16;
+  let y0=m;const title=latin1(o.title.trim());
+  if(title){pdf.setFont('helvetica','bold');pdf.setFontSize(16);pdf.setTextColor(23,35,43);pdf.text(pdf.splitTextToSize(title,pw-2*m)[0],m,m+12);y0=m+32;}
+  const availW=pw-2*m,firstH=ph-y0-m-foot,otherH=ph-2*m-foot;
+  if(single){
+    const s=Math.min(.75,availW/W,firstH/H),w=W*s,h=H*s;
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG',m+(availW-w)/2,y0,w,h,undefined,'FAST');
+  }else{
+    const s=Math.min(.75,availW/W),pxPerPt=k/s,w=W*s,x=m+(availW-w)/2;
+    let cy=0,first=true;
+    while(cy<canvas.height-1){
+      let take=Math.floor((first?firstH:otherH)*pxPerPt);
+      take=cy+take<canvas.height?bestCut(canvas,cy,take):canvas.height-cy;
+      const part=document.createElement('canvas');part.width=canvas.width;part.height=take;
+      part.getContext('2d').drawImage(canvas,0,cy,canvas.width,take,0,0,canvas.width,take);
+      if(!first) pdf.addPage(o.page,'portrait');
+      pdf.addImage(part.toDataURL('image/png'),'PNG',x,first?y0:m,w,take/pxPerPt,undefined,'FAST');
+      cy+=take;first=false;
+    }
+  }
+  if(o.code){
+    pdf.addPage(o.page,'portrait');
+    const pw2=pdf.internal.pageSize.getWidth(),ph2=pdf.internal.pageSize.getHeight();
+    pdf.setFont('helvetica','bold');pdf.setFontSize(14);pdf.setTextColor(23,35,43);pdf.text('Codice Python',m,m+10);
+    pdf.setFont('courier','normal');const fs=9.5,lh=12.5;pdf.setFontSize(fs);
+    const per=Math.floor((pw2-2*m)/(fs*0.6));let y=m+36;
+    for(const raw of genPython().split('\n')){
+      const line=latin1(raw),ind=line.match(/^ */)[0];let rest=line;const chunks=[];
+      while(rest.length>per){chunks.push(rest.slice(0,per));rest=ind+'    '+rest.slice(per);}
+      chunks.push(rest);
+      for(const c of chunks){if(y>ph2-m-foot){pdf.addPage(o.page,'portrait');y=m+10;}if(c.trim()) pdf.text(c,m,y);y+=lh;}
+    }
+  }
+  const n=pdf.getNumberOfPages(),date=new Date().toLocaleDateString('it-IT');
+  for(let i=1;i<=n;i++){pdf.setPage(i);const w2=pdf.internal.pageSize.getWidth(),h2=pdf.internal.pageSize.getHeight();
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(120,130,135);
+    pdf.text(`Flussogramma - ${date}`,m,h2-m/2);pdf.text(`${i} / ${n}`,w2-m,h2-m/2,{align:'right'});}
+  return pdf.output('arraybuffer');
+}
+async function getDownloads(){try{return window.claude&&window.claude.use?await window.claude.use('downloads'):null;}catch(e){return null;}}
+const slug=t=>(t.trim()||'diagramma').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase().slice(0,60)||'diagramma';
+async function offerFile(filename,data,msgEl){
+  const dl=await getDownloads();
+  if(!dl){
+    if(window.claude){showMsg(msgEl,'Il download non è disponibile in questa visualizzazione.',true);return false;}
+    const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));
+    const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);return true;}
+  try{await dl.save({filename,data});return true;}
+  catch(e){const c=e&&e.code;
+    if(c==='declined') showMsg(msgEl,'Download annullato.',false);
+    else if(c==='rate_limited') showMsg(msgEl,'C\'è già una richiesta di download aperta: confermala o chiudila, poi riprova.',true);
+    else showMsg(msgEl,'Non è stato possibile scaricare il file'+(e&&e.message?`: ${e.message}`:'.'),true);
+    return false;}
+}
+function showMsg(el,t,isErr){el.textContent=t;el.className=isErr?'errbox':'infobox';el.hidden=false;}
+const exScrim=$('#exScrim'),exMsg=$('#exMsg');
+$('#btnExport').onclick=()=>{exMsg.hidden=true;exScrim.hidden=false;$('#exTitle').focus();loadJsPDF().catch(()=>{});};
+$('#exClose').onclick=()=>exScrim.hidden=true;
+exScrim.addEventListener('pointerdown',e=>{if(e.target===exScrim) exScrim.hidden=true;});
+function exBusy(on){['#exPdf','#exPng'].forEach(s=>$(s).disabled=on);$('#exPdf').textContent=on?'Preparo il file…':'Scarica PDF';}
+$('#exPdf').onclick=async()=>{
+  exMsg.hidden=true;exBusy(true);
+  try{
+    const data=await makePDF({title:$('#exTitle').value,page:$('#exPage').value,layout:$('#exLayout').value,code:$('#exCode').checked});
+    if(await offerFile(slug($('#exTitle').value)+'.pdf',data,exMsg)){exScrim.hidden=true;toast('PDF pronto.');}
+  }catch(e){showMsg(exMsg,e&&e.message==='jsPDF'?'Non riesco a caricare il generatore di PDF: controlla la connessione e riprova.':'Esportazione non riuscita: '+(e&&e.message||e),true);}
+  finally{exBusy(false);}
+};
+$('#exPng').onclick=async()=>{
+  exMsg.hidden=true;exBusy(true);
+  try{
+    const {canvas}=await rasterize(exportSVG());
+    const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+    if(await offerFile(slug($('#exTitle').value)+'.png',blob,exMsg)){exScrim.hidden=true;toast('Immagine pronta.');}
+  }catch(e){showMsg(exMsg,'Esportazione non riuscita: '+(e&&e.message||e),true);}
+  finally{exBusy(false);}
+};
+$('#ioSave').onclick=async()=>{ioErr.hidden=true;if(await offerFile('diagramma.json',ioText.value,ioErr)) toast('File salvato.');};
+
+/* ---------- tabs & keys ---------- */
+function selectTab(t){
+  const r=t==='run';
+  $('#tabRun').setAttribute('aria-selected',String(r));$('#tabCode').setAttribute('aria-selected',String(!r));
+  $('#pRun').hidden=!r;$('#pCode').hidden=r;
+  if(!r) updCode();
+}
+$('#tabRun').onclick=()=>selectTab('run');$('#tabCode').onclick=()=>selectTab('code');
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(!menu.hidden) closeMenu();else if(!edScrim.hidden) cancelEditor();else if(!ioScrim.hidden) ioScrim.hidden=true;else if(!exScrim.hidden) exScrim.hidden=true;return;}
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement&&document.activeElement.tagName);
+  if(typing||!edScrim.hidden||!ioScrim.hidden||!exScrim.hidden) return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey){e.preventDefault();undo();}
+  else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.key.toLowerCase()==='z'&&e.shiftKey))){e.preventDefault();redo();}
+});
+
+/* ---------- init ---------- */
+try{const s=localStorage.getItem(KEY);if(s){const p=JSON.parse(s);prog={body:sanitize(p.body)};}}catch(e){}
+if(!prog.body.length) prog={body:EXAMPLES[0].build()};
+render();refreshVars();updCode();updUndo();setState('idle');
+if(scroller.clientWidth&&CW>scroller.clientWidth){zoom=Math.max(.5,+((scroller.clientWidth-8)/CW).toFixed(2));applyZoom();}
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>render());
+})();
+</script>
+
+</body>
+</html>
