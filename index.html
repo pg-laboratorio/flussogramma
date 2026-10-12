@@ -110,6 +110,21 @@ body.busy .legend-tip{visibility:hidden}
 #chart .ins:hover .ins-dot,#chart .ins:focus-visible .ins-dot,#chart .ins.open .ins-dot{fill:var(--accent);stroke:var(--accent);opacity:1}
 #chart .ins:hover .ins-plus,#chart .ins:focus-visible .ins-plus,#chart .ins.open .ins-plus{stroke:var(--accent-ink);opacity:1}
 body.busy #chart .ins{display:none}
+#chart .blk{touch-action:none}
+body:not(.busy) #chart .blk{cursor:grab}
+body.dragging,body.dragging *{cursor:grabbing!important}
+body.dragging #chart .blk:hover .sh{stroke-width:1.6}
+#chart .drag-src{opacity:.35}
+body.dragging #chart .ins-dot{opacity:1;stroke:var(--accent);stroke-width:1.6}
+body.dragging #chart .ins-plus{opacity:.9;stroke:var(--accent)}
+#chart .ins.ins-blocked{display:none}
+#chart .ins.drop .ins-dot{fill:var(--accent);stroke:var(--accent);transform:scale(1.7);transform-box:fill-box;transform-origin:center}
+#chart .ins.drop .ins-plus{stroke:var(--accent-ink);opacity:1}
+#chart .moved .sh{animation:moved 1s ease-out}
+@keyframes moved{0%{stroke:var(--accent);stroke-width:4}100%{stroke-width:1.6}}
+.drag-ghost{position:fixed;z-index:40;left:0;top:0;pointer-events:none;display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--accent);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);font:13px var(--mono);color:var(--ink);white-space:nowrap;max-width:min(360px,80vw);overflow:hidden;text-overflow:ellipsis}
+.drag-ghost svg{width:30px;height:18px;flex:none}
+.drag-ghost .copy{font:600 11px var(--sans);color:var(--accent-ink);background:var(--accent);border-radius:4px;padding:1px 6px}
 
 /* side rail */
 .side{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface);border-left:1px solid var(--rule)}
@@ -228,7 +243,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
 <main class="work">
   <section class="canvas-wrap" id="wrap">
     <div id="scroller"><svg id="chart" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Diagramma di flusso"></svg></div>
-    <div class="legend-tip">Clicca un <b>+</b> per aggiungere un blocco, un blocco per modificarlo</div>
+    <div class="legend-tip" id="tip">Clicca un <b>+</b> per aggiungere un blocco · clicca un blocco per modificarlo · trascinalo per spostarlo</div>
     <div class="zoom" role="group" aria-label="Zoom">
       <button type="button" id="zOut" aria-label="Riduci">−</button>
       <span class="zl" id="zLbl">100%</span>
@@ -395,16 +410,54 @@ class SynErr extends Error{}
 class RunErr extends Error{}
 class Fl{constructor(v){this.v=v;}}
 const isF=x=>x instanceof Fl;
-const isNum=x=>typeof x==='number'||typeof x==='boolean'||x instanceof Fl;
-const isIntLike=x=>typeof x==='number'||typeof x==='boolean';
-const nv=x=>x instanceof Fl?x.v:(typeof x==='boolean'?(x?1:0):x);
+const isNum=x=>typeof x==='number'||typeof x==='bigint'||typeof x==='boolean'||x instanceof Fl;
+const isIntLike=x=>typeof x==='number'||typeof x==='bigint'||typeof x==='boolean';
+const nv=x=>x instanceof Fl?x.v:(typeof x==='boolean'?(x?1:0):typeof x==='bigint'?Number(x):x);
+/* int di Python: number finché è esatto, BigInt oltre 2^53 */
+const iv=x=>typeof x==='boolean'?(x?1:0):x;
+const raw=x=>x instanceof Fl?x.v:iv(x);
+const MAXS=9007199254740991n;
+const normI=x=>typeof x==='bigint'&&x>=-MAXS&&x<=MAXS?Number(x):x;
+function intOf(v){if(!isFinite(v)) throw new RunErr(`non posso convertire ${fmtFloat(v)} in int`);const t=Math.trunc(v);return Number.isSafeInteger(t)?(t===0?0:t):BigInt(t);}
+function intArith(op,a,b){
+  if(typeof a==='number'&&typeof b==='number'&&op!=='**'){
+    let r=NaN;
+    if(op==='+') r=a+b;else if(op==='-') r=a-b;else if(op==='*') r=a*b;
+    else if(Math.abs(a)+Math.abs(b)<=9007199254740991){let m=a%b;if(m!==0&&(m<0)!==(b<0)) m+=b;r=op==='%'?m:(a-m)/b;}
+    if(Number.isSafeInteger(r)) return r===0?0:r;
+  }
+  const A=BigInt(a),B=BigInt(b);let r;
+  switch(op){
+    case '+': r=A+B;break; case '-': r=A-B;break; case '*': r=A*B;break;
+    case '//': r=A/B;if(A%B!==0n&&((A<0n)!==(B<0n))) r-=1n;break;
+    case '%': r=A%B;if(r!==0n&&((r<0n)!==(B<0n))) r+=B;break;
+    case '**': if(B>100000n||(A!==0n&&A!==1n&&A!==-1n&&B*BigInt(A.toString(2).length)>4000000n)) throw new RunErr('risultato troppo grande da calcolare');r=A**B;break;
+  }
+  return normI(r);
+}
+/* formattazione dei float come in Python */
+function pyFixed(v,f){
+  if(!isFinite(v)) return fmtFloat(v);
+  const s=v.toFixed(f),ext=Math.abs(v).toFixed(Math.min(100,f+30)),dot=ext.indexOf('.');
+  if(/^50*$/.test(ext.slice(dot+1+f))){
+    let tr=ext.slice(0,dot+1+f);if(tr.endsWith('.')) tr=tr.slice(0,-1);
+    if(+tr[tr.length-1]%2===0) return (v<0||Object.is(v,-0)?'-':'')+tr;
+  }
+  return Object.is(v,-0)&&!s.startsWith('-')?'-'+s:s;
+}
 const mk=(v,f)=>f?new Fl(v):v;
-function pyType(x){if(x===null||x===undefined) return 'NoneType';if(typeof x==='boolean') return 'bool';if(typeof x==='number') return 'int';if(x instanceof Fl) return 'float';if(typeof x==='string') return 'str';if(Array.isArray(x)) return 'list';return '?';}
-function fmtFloat(v){if(isNaN(v)) return 'nan';if(!isFinite(v)) return v>0?'inf':'-inf';if(Number.isInteger(v)&&Math.abs(v)<1e16) return v.toFixed(1);return String(v);}
+function pyType(x){if(x===null||x===undefined) return 'NoneType';if(typeof x==='boolean') return 'bool';if(typeof x==='number'||typeof x==='bigint') return 'int';if(x instanceof Fl) return 'float';if(typeof x==='string') return 'str';if(Array.isArray(x)) return 'list';return '?';}
+function fmtFloat(v){
+  if(isNaN(v)) return 'nan';if(!isFinite(v)) return v>0?'inf':'-inf';
+  if(v===0) return Object.is(v,-0)?'-0.0':'0.0';
+  const a=Math.abs(v);
+  if(a>=1e16||a<1e-4){const [m,e]=v.toExponential().split('e');let d=e.replace(/^[+-]/,'');if(d.length<2) d='0'+d;return `${m}e${e[0]==='-'?'-':'+'}${d}`;}
+  const s=String(v);return /[.e]/.test(s)?s:s+'.0';
+}
 function repr(x){
   if(x===null||x===undefined) return 'None';
   if(typeof x==='boolean') return x?'True':'False';
-  if(typeof x==='number') return String(x);
+  if(typeof x==='number'||typeof x==='bigint') return String(x);
   if(x instanceof Fl) return fmtFloat(x.v);
   if(typeof x==='string') return (x.includes("'")&&!x.includes('"'))?`"${x}"`:`'${x.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n')}'`;
   if(Array.isArray(x)) return '['+x.map(repr).join(', ')+']';
@@ -417,13 +470,13 @@ const needInt=(x,op)=>{if(!isIntLike(x)) throw new RunErr(`${op} vuole un int, m
 const needStr=(x,op)=>{if(typeof x!=='string') throw new RunErr(`${op} vuole un str, ma ha ricevuto ${pyType(x)} ${repr(x)}`);};
 const needList=(x,op)=>{if(!Array.isArray(x)) throw new RunErr(`${op} vuole una list, ma ha ricevuto ${pyType(x)}`);};
 function pyEq(x,y){
-  if(isNum(x)&&isNum(y)) return nv(x)===nv(y);
+  if(isNum(x)&&isNum(y)) return raw(x)==raw(y);
   if(Array.isArray(x)&&Array.isArray(y)) return x.length===y.length&&x.every((e,i)=>pyEq(e,y[i]));
   if((x===null||x===undefined)&&(y===null||y===undefined)) return true;
   return x===y;
 }
 function pyOrder(x,y,op){
-  if(isNum(x)&&isNum(y)){const a=nv(x),b=nv(y);return a<b?-1:a>b?1:0;}
+  if(isNum(x)&&isNum(y)){const a=raw(x),b=raw(y);return a<b?-1:a>b?1:0;}
   if(typeof x==='string'&&typeof y==='string') return x<y?-1:x>y?1:0;
   if(Array.isArray(x)&&Array.isArray(y)){for(let i=0;i<Math.min(x.length,y.length);i++){if(!pyEq(x[i],y[i])) return pyOrder(x[i],y[i],op);}return x.length-y.length;}
   throw new RunErr(`non posso confrontare ${pyType(x)} e ${pyType(y)} con «${op}»`);
@@ -443,23 +496,33 @@ function binop(op,x,y){
   if(op==='+'){
     if(typeof x==='string'&&typeof y==='string') return x+y;
     if(Array.isArray(x)&&Array.isArray(y)) return x.concat(y);
-    if(isNum(x)&&isNum(y)) return mk(nv(x)+nv(y),isF(x)||isF(y));
-    throw typeErr(op,x,y);
+    if(!isNum(x)||!isNum(y)) throw typeErr(op,x,y);
   }
   if(op==='*'){
     if((typeof x==='string'||Array.isArray(x))&&isIntLike(y)) return repeatSeq(x,y);
     if(isIntLike(x)&&(typeof y==='string'||Array.isArray(y))) return repeatSeq(y,x);
   }
   if(!isNum(x)||!isNum(y)) throw typeErr(op,x,y);
-  const a=nv(x),b=nv(y),f=isF(x)||isF(y);
-  switch(op){
-    case '-': return mk(a-b,f);
-    case '*': return mk(a*b,f);
-    case '/': if(b===0) throw new RunErr('divisione per zero (ZeroDivisionError)');return new Fl(a/b);
-    case '//': if(b===0) throw new RunErr('divisione per zero (ZeroDivisionError)');return mk(Math.floor(a/b),f);
-    case '%': if(b===0) throw new RunErr('resto della divisione per zero (ZeroDivisionError)');return mk(((a%b)+b)%b,f);
-    case '**': return (f||b<0)?new Fl(Math.pow(a,b)):Math.pow(a,b);
+  const zero=()=>new RunErr(op==='%'?'resto della divisione per zero (ZeroDivisionError)':'divisione per zero (ZeroDivisionError)');
+  const f=isF(x)||isF(y);
+  if(op==='/'){const b=nv(y);if(b===0) throw zero();return new Fl(nv(x)/b);}
+  if(!f){
+    const a=iv(x),b=iv(y);
+    if((op==='//'||op==='%')&&(b===0||b===0n)) throw zero();
+    if(op==='**'&&b<0){if(a===0||a===0n) throw new RunErr('0 elevato a un numero negativo (ZeroDivisionError)');return new Fl(Math.pow(nv(a),nv(b)));}
+    return intArith(op,a,b);
   }
+  const a=nv(x),b=nv(y);let r;
+  switch(op){
+    case '+': r=a+b;break; case '-': r=a-b;break; case '*': r=a*b;break;
+    case '//': if(b===0) throw zero();r=Math.floor(a/b);break;
+    case '%': if(b===0) throw zero();r=a%b;if(r!==0&&(r<0)!==(b<0)) r+=b;else if(r===0) r=b<0?-0:0;break;
+    case '**': if(a===0&&b<0) throw new RunErr('0.0 elevato a un numero negativo (ZeroDivisionError)');
+      if(a<0&&!Number.isInteger(b)) throw new RunErr('la potenza di un numero negativo con esponente decimale darebbe un numero complesso, non supportato');
+      r=Math.pow(a,b);break;
+  }
+  if(op==='**'&&!isFinite(r)&&isFinite(a)&&isFinite(b)) throw new RunErr('risultato troppo grande per un float (OverflowError)');
+  return new Fl(r);
 }
 function normIdx(c,i){
   if(!isIntLike(i)) throw new RunErr(`l'indice deve essere un int, non ${pyType(i)} ${repr(i)}`);
@@ -478,13 +541,19 @@ const FLOATRE=/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 const seqArgs=(args,op)=>{const a=args.length===1?args[0]:args;if(args.length===1&&typeof a!=='string'&&!Array.isArray(a)) throw new RunErr(`${op}() con un solo argomento vuole una lista`);const l=Array.isArray(a)?a:[...a];if(!l.length) throw new RunErr(`${op}() di una sequenza vuota`);return l;};
 
 const BI={
-  abs:[1,1,([x])=>{needNum(x,'abs()');return mk(Math.abs(nv(x)),isF(x));}],
-  int:[1,1,([x])=>{if(typeof x==='string'){if(!/^\s*[+-]?\d+\s*$/.test(x)) throw new RunErr(`int(): il testo ${repr(x)} non è un numero intero`);return parseInt(x,10);}needNum(x,'int()');return Math.trunc(nv(x));}],
+  abs:[1,1,([x])=>{needNum(x,'abs()');if(isF(x)) return new Fl(Math.abs(x.v));const i=iv(x);return typeof i==='bigint'?(i<0n?-i:i):Math.abs(i);}],
+  int:[1,1,([x])=>{if(typeof x==='string'){if(!/^\s*[+-]?\d+\s*$/.test(x)) throw new RunErr(`int(): il testo ${repr(x)} non è un numero intero`);return normI(BigInt(x.trim()));}needNum(x,'int()');return isF(x)?intOf(x.v):iv(x);}],
   float:[1,1,([x])=>{if(typeof x==='string'){const t=x.trim();if(!FLOATRE.test(t)) throw new RunErr(`float(): il testo ${repr(x)} non è un numero`);return new Fl(parseFloat(t));}needNum(x,'float()');return new Fl(nv(x));}],
   str:[1,1,([x])=>pyStr(x)],
   bool:[1,1,([x])=>truthy(x)],
   len:[1,1,([x])=>{if(typeof x==='string'||Array.isArray(x)) return x.length;throw new RunErr(`len() non funziona con ${pyType(x)}`);}],
-  round:[1,2,([x,n])=>{needNum(x,'round()');if(n===undefined) return roundHalfEven(nv(x));needInt(n,'round()');const p=10**nv(n);const r=Math.round(nv(x)*p)/p;return isF(x)?new Fl(r):Math.round(r);}],
+  round:[1,2,([x,n])=>{needNum(x,'round()');
+    if(n===undefined) return isF(x)?intOf(roundHalfEven(x.v)):iv(x);
+    needInt(n,'round()');const d=nv(n);
+    if(isF(x)) return new Fl(d>=0?parseFloat(pyFixed(x.v,Math.min(d,100))):roundHalfEven(x.v/10**-d)*10**-d);
+    if(d>=0) return iv(x);
+    const P=10n**BigInt(-d),X=BigInt(iv(x));let q=X/P;if(X%P!==0n&&X<0n) q-=1n;const r2=(X-q*P)*2n;
+    if(r2>P||(r2===P&&q%2n!==0n)) q+=1n;return normI(q*P);}],
   min:[1,99,a=>seqArgs(a,'min').reduce((m,e)=>pyOrder(e,m,'min')<0?e:m)],
   max:[1,99,a=>seqArgs(a,'max').reduce((m,e)=>pyOrder(e,m,'max')>0?e:m)],
   sum:[1,1,([l])=>{needList(l,'sum()');return l.reduce((s,e)=>binop('+',s,e),0);}],
@@ -494,8 +563,8 @@ const BI={
 const MODS={
   math:{
     sqrt:[1,1,([x])=>{needNum(x,'math.sqrt()');if(nv(x)<0) throw new RunErr('math.sqrt() di un numero negativo');return new Fl(Math.sqrt(nv(x)));}],
-    floor:[1,1,([x])=>(needNum(x,'math.floor()'),Math.floor(nv(x)))],
-    ceil:[1,1,([x])=>(needNum(x,'math.ceil()'),Math.ceil(nv(x)))],
+    floor:[1,1,([x])=>(needNum(x,'math.floor()'),isF(x)?intOf(Math.floor(x.v)):iv(x))],
+    ceil:[1,1,([x])=>(needNum(x,'math.ceil()'),isF(x)?intOf(Math.ceil(x.v)):iv(x))],
     fabs:[1,1,([x])=>(needNum(x,'math.fabs()'),new Fl(Math.abs(nv(x))))],
     pow:[2,2,([x,y])=>(needNum(x,'math.pow()'),needNum(y,'math.pow()'),new Fl(Math.pow(nv(x),nv(y))))],
     sin:[1,1,([x])=>(needNum(x,'math.sin()'),new Fl(Math.sin(nv(x))))],
@@ -561,7 +630,7 @@ function tokenize(src){
       let j=i,fl=false;while(/[0-9_]/.test(src[j]||''))j++;
       if(src[j]==='.'&&!/[A-Za-z_]/.test(src[j+1]||'')){fl=true;j++;while(/[0-9_]/.test(src[j]||''))j++;}
       if(/[eE]/.test(src[j]||'')&&/^[+-]?[0-9]/.test(src.substr(j+1,2))){fl=true;j++;if(/[+-]/.test(src[j]))j++;while(/[0-9]/.test(src[j]||''))j++;}
-      const raw=src.slice(i,j);t.push({k:'num',v:parseFloat(raw.replace(/_/g,'')),fl});i=j;continue;}
+      const raw=src.slice(i,j).replace(/_/g,'');t.push({k:'num',v:fl?parseFloat(raw):normI(BigInt(raw)),fl});i=j;continue;}
     if((c==='f'||c==='F')&&(src[i+1]==='"'||src[i+1]==="'")){const r=readStr(i+1);t.push({k:'fstr',raw:r.raw});i=r.end;continue;}
     if(c==='"'||c==="'"){const r=readStr(i);t.push({k:'str',v:unescape(r.raw)});i=r.end;continue;}
     if(/[A-Za-z_À-ɏ]/.test(c)){let j=i;while(j<L&&/[A-Za-z0-9_À-ɏ]/.test(src[j]))j++;t.push({k:'id',v:src.slice(i,j)});i=j;continue;}
@@ -699,8 +768,8 @@ function parseF(raw){
 function fmtSpec(x,spec){
   if(!spec) return pyStr(x);
   const [,al,w,prec,ty]=SPECRE.exec(spec);let s;
-  if(prec!==undefined||ty==='f'){needNum(x,'il formato :.f');s=nv(x).toFixed(prec!==undefined?+prec:6);}
-  else if(ty==='d'){if(typeof x!=='number') throw new RunErr(`il formato :d vuole un int, non ${pyType(x)}`);s=String(x);}
+  if(prec!==undefined||ty==='f'){needNum(x,'il formato :.f');s=pyFixed(nv(x),prec!==undefined?+prec:6);}
+  else if(ty==='d'){if(!isIntLike(x)) throw new RunErr(`il formato :d vuole un int, non ${pyType(x)}`);s=String(iv(x));}
   else s=pyStr(x);
   if(w){const Wd=+w,align=al||(isNum(x)?'>':'<');if(s.length<Wd){const pad=Wd-s.length;s=align==='>'?' '.repeat(pad)+s:align==='<'?s+' '.repeat(pad):' '.repeat(pad>>1)+s+' '.repeat(pad-(pad>>1));}}
   return s;
@@ -723,7 +792,7 @@ function ev(a){
     case 'call': return BI[a.f][2](a.args.map(ev));
     case 'mcall': return MODS[a.mod][a.f][2](a.args.map(ev));
     case 'meth': {const o=ev(a.obj);return callMethod(o,a.name,a.args.map(ev));}
-    case 'un': {const x=ev(a.a);if(a.op==='not') return !truthy(x);if(!isNum(x)) throw new RunErr(`non posso usare il segno «${a.op}» davanti a un ${pyType(x)}`);return mk(a.op==='-'?-nv(x):nv(x),isF(x));}
+    case 'un': {const x=ev(a.a);if(a.op==='not') return !truthy(x);if(!isNum(x)) throw new RunErr(`non posso usare il segno «${a.op}» davanti a un ${pyType(x)}`);if(isF(x)) return new Fl(a.op==='-'?-x.v:x.v);const i=iv(x);return a.op==='-'?(typeof i==='bigint'?normI(-i):(i===0?0:-i)):i;}
     case 'and': {const x=ev(a.a);return truthy(x)?ev(a.b):x;}
     case 'or': {const x=ev(a.a);return truthy(x)?x:ev(a.b);}
     case 'bin': return binop(a.op,ev(a.a),ev(a.b));
@@ -953,8 +1022,98 @@ menu.addEventListener('click',e=>{
 });
 document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!menu.contains(e.target)&&!e.target.closest('.ins')) closeMenu();});
 
-svg.addEventListener('click',e=>activate(e.target));
-svg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(e.target);}});
+let suppressClick=false;
+svg.addEventListener('click',e=>{if(suppressClick){suppressClick=false;return;}activate(e.target);});
+svg.addEventListener('keydown',e=>{
+  if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){const b=e.target.closest('.blk');if(b){e.preventDefault();nudge(b.dataset.id,e.key==='ArrowUp'?-1:1);}return;}
+  if(e.key==='Enter'||e.key===' '){e.preventDefault();activate(e.target);}
+});
+
+/* ---------- drag & drop ---------- */
+const tipEl=$('#tip'),TIP0=tipEl.innerHTML;
+let drag=null;
+function focusMoved(id){
+  const g=svg.querySelector(`.blk[data-id="${id}"]`);if(!g) return;
+  g.classList.add('moved');g.focus({preventScroll:true});
+  const r=g.getBoundingClientRect(),sr=scroller.getBoundingClientRect();
+  if(r.top<sr.top||r.bottom>sr.bottom) g.scrollIntoView({block:'nearest'});
+}
+function nudge(id,dir){
+  if(busy()) return;
+  const r=reg.nodes[id];if(!r) return;const arr=r.arr,i=arr.indexOf(r.n),j=i+dir;
+  if(j<0||j>=arr.length){toast(dir<0?'Il blocco è già il primo del suo gruppo.':'Il blocco è già l\'ultimo del suo gruppo.');return;}
+  pushUndo(snap());arr.splice(i,1);arr.splice(j,0,r.n);changed();focusMoved(id);
+}
+function innerArrays(n){const set=new Set();(function rec(m){kids(m).forEach(a=>{set.add(a);a.forEach(rec);});})(n);return set;}
+svg.addEventListener('pointerdown',e=>{
+  if(e.button!==0||busy()||!edScrim.hidden) return;
+  const b=e.target.closest('.blk');if(!b||!reg.nodes[b.dataset.id]) return;
+  drag={id:b.dataset.id,g:b,x0:e.clientX,y0:e.clientY,started:false,pid:e.pointerId,target:null,copy:false};
+});
+function startDrag(e){
+  const {n}=reg.nodes[drag.id];
+  closeMenu();drag.started=true;drag.before=snap();
+  try{svg.setPointerCapture(drag.pid);}catch(_){}
+  const blocked=innerArrays(n);
+  drag.dots=[...svg.querySelectorAll('.ins')].filter(el=>{const t=reg.ins[+el.dataset.ins];if(blocked.has(t.arr)){el.classList.add('ins-blocked');return false;}return true;});
+  drag.g.classList.add('drag-src');document.body.classList.add('dragging');
+  const gh=document.createElement('div');gh.className='drag-ghost';
+  gh.innerHTML=swatch(n.t)+`<span>${esc(plain(parts(n)))}</span><span class="copy" hidden>+ copia</span>`;
+  document.body.append(gh);drag.ghost=gh;
+  tipEl.innerHTML='Rilascia su un punto <b>+</b> · tieni premuto <b>Ctrl</b> per copiare · <b>Esc</b> per annullare';
+  autoScroll();
+}
+function moveDrag(e){
+  drag.lx=e.clientX;drag.ly=e.clientY;
+  drag.copy=e.ctrlKey||e.metaKey||e.altKey;
+  drag.ghost.style.transform=`translate(${e.clientX+14}px,${e.clientY+10}px)`;
+  drag.ghost.querySelector('.copy').hidden=!drag.copy;
+  let best=null,bd=Infinity;
+  for(const el of drag.dots){const r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,d=Math.hypot(cx-e.clientX,(cy-e.clientY)*1.15);if(d<bd){bd=d;best=el;}}
+  if(bd>90) best=null;
+  if(best!==drag.target){if(drag.target) drag.target.classList.remove('drop');drag.target=best;if(best) best.classList.add('drop');}
+}
+function autoScroll(){
+  if(!drag||!drag.started) return;
+  if(drag.lx!=null){
+    const r=scroller.getBoundingClientRect(),E=48;let dx=0,dy=0;
+    if(drag.ly<r.top+E) dy=-Math.ceil((r.top+E-drag.ly)/4);else if(drag.ly>r.bottom-E) dy=Math.ceil((drag.ly-(r.bottom-E))/4);
+    if(drag.lx<r.left+E) dx=-Math.ceil((r.left+E-drag.lx)/4);else if(drag.lx>r.right-E) dx=Math.ceil((drag.lx-(r.right-E))/4);
+    if(dx||dy){scroller.scrollBy(dx,dy);moveDrag({clientX:drag.lx,clientY:drag.ly,ctrlKey:drag.copy,metaKey:false,altKey:false});}
+  }
+  drag.raf=requestAnimationFrame(autoScroll);
+}
+function endDrag(drop){
+  const d=drag;drag=null;if(!d) return;
+  cancelAnimationFrame(d.raf);
+  if(!d.started) return;
+  suppressClick=true;setTimeout(()=>suppressClick=false,0);
+  d.ghost.remove();document.body.classList.remove('dragging');tipEl.innerHTML=TIP0;
+  svg.querySelectorAll('.ins-blocked,.drop').forEach(el=>el.classList.remove('ins-blocked','drop'));
+  d.g.classList.remove('drag-src');
+  if(!drop||!d.target) return;
+  const {n,arr:from}=reg.nodes[d.id],{arr,i}=reg.ins[+d.target.dataset.ins];
+  if(d.copy){
+    const c=sanitize([JSON.parse(JSON.stringify(n))])[0];
+    pushUndo(d.before);arr.splice(i,0,c);changed();focusMoved(c.id);toast('Blocco copiato.');return;
+  }
+  const idx=from.indexOf(n);
+  if(arr===from&&(i===idx||i===idx+1)) return;
+  pushUndo(d.before);from.splice(idx,1);arr.splice(arr===from&&i>idx?i-1:i,0,n);changed();focusMoved(n.id);
+}
+window.addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.pid) return;
+  if(!drag.started){if(Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<6) return;startDrag(e);}
+  e.preventDefault();moveDrag(e);
+});
+window.addEventListener('pointerup',e=>{if(drag&&e.pointerId===drag.pid) endDrag(true);});
+window.addEventListener('pointercancel',e=>{if(drag&&e.pointerId===drag.pid) endDrag(false);});
+window.addEventListener('keydown',e=>{
+  if(!drag||!drag.started) return;
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();endDrag(false);}
+  else if(e.key==='Control'||e.key==='Meta'||e.key==='Alt'){drag.copy=true;drag.ghost.querySelector('.copy').hidden=false;}
+},true);
+window.addEventListener('keyup',e=>{if(drag&&drag.started&&(e.key==='Control'||e.key==='Meta'||e.key==='Alt')){drag.copy=false;drag.ghost.querySelector('.copy').hidden=true;}});
 function activate(t){
   const ins=t.closest('.ins');
   if(ins){if(busy()) return;openMenu(+ins.dataset.ins,ins);return;}
@@ -1058,7 +1217,7 @@ speedEl.oninput=()=>{$('#speedLbl').textContent=SPEEDS[+speedEl.value][1];};
 
 function parseInput(raw,type){
   const s=raw.trim();
-  if(type==='int'){if(!/^[+-]?\d+$/.test(s)) return {err:`«${raw}» non si può convertire in int (numero intero). Riprova.`};return {v:parseInt(s,10)};}
+  if(type==='int'){if(!/^[+-]?\d+$/.test(s)) return {err:`«${raw}» non si può convertire in int (numero intero). Riprova.`};return {v:normI(BigInt(s))};}
   if(type==='float'){if(/^[+-]?\d+,\d+$/.test(s)) return {err:`In Python i decimali si scrivono con il punto: ${s.replace(',','.')}. Riprova.`};if(!FLOATRE.test(s)) return {err:`«${raw}» non si può convertire in float (numero). Riprova.`};return {v:new Fl(parseFloat(s))};}
   return {v:raw};
 }
@@ -1173,7 +1332,7 @@ function finish(){
 function fail(e){
   clearTimeout(run.timer);endInput();openLine=null;
   const msg=e instanceof RunErr?e.message:'errore interno: '+(e&&e.message||e);
-  conLine('Errore: '+msg.charAt(0).toUpperCase()+msg.slice(1),'err');
+  conLine('Errore: '+(/^[a-z_.]+\(/.test(msg)?msg:msg.charAt(0).toUpperCase()+msg.slice(1)),'err');
   setState('error');paintCur(true);if(run.curEl) run.curEl.classList.add('err');
   refreshVars();
 }

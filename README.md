@@ -13,9 +13,10 @@ Funziona nel browser, anche da tablet e telefono. Non serve installare nulla né
 
 1. Clicca un **+** sulle frecce e scegli il blocco da inserire.
 2. Clicca un blocco per modificarlo, copiarlo, tagliarlo o eliminarlo.
-3. Premi **Esegui** per far girare il programma, oppure **Passo** per avanzare un blocco alla volta.
-4. Guarda la **console** (output e input) e la tabella delle **variabili**.
-5. Nella scheda **Codice** trovi il programma tradotto in Python e in pseudocodice.
+3. **Trascina** un blocco su un altro punto **+** per spostarlo, anche dentro un Se o un ciclo. Tieni premuto **Ctrl** mentre lo rilasci per farne una copia; **Esc** annulla. Da tastiera: seleziona il blocco con Tab e usa **Alt+↑ / Alt+↓**.
+4. Premi **Esegui** per far girare il programma, oppure **Passo** per avanzare un blocco alla volta.
+5. Guarda la **console** (output e input) e la tabella delle **variabili**.
+6. Nella scheda **Codice** trovi il programma tradotto in Python e in pseudocodice.
 
 Un blocco con il bordo rosso tratteggiato contiene un errore: cliccalo per leggere cosa non va.
 
