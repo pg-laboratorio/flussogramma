@@ -396,11 +396,6 @@ const C=text=>make('comment',{text});
 const EXAMPLES=[
   {name:'Somma da 1 a N',build:()=>[I('n','int','"Quanti numeri vuoi sommare? "'),A('somma','0'),F('i','1','n + 1','1',[A('somma','somma + i')]),O('"La somma è", somma')]},
   {name:'Pari o dispari',build:()=>[I('n','int','"Inserisci un numero intero: "'),IF('n % 2 == 0',[O('n, "è pari"')],[O('n, "è dispari"')])]},
-  {name:'Tabellina',build:()=>[I('n','int','"Di quale numero vuoi la tabellina? "'),F('i','1','11','1',[O('n, "x", i, "=", n * i')])]},
-  {name:'Conto alla rovescia',build:()=>[A('n','5'),W('n > 0',[O('n'),A('n','n - 1')]),O('"Via!"')]},
-  {name:'Indovina il numero',build:()=>[C('Il computer sceglie un numero a caso'),A('segreto','random.randint(1, 100)'),A('tentativi','0'),O('"Ho pensato un numero da 1 a 100"'),DO([I('tentativo','int','"Il tuo tentativo: "'),A('tentativi','tentativi + 1'),IF('tentativo < segreto',[O('"Più grande!"')],[IF('tentativo > segreto',[O('"Più piccolo!"')],[])])],'tentativo != segreto'),O('f"Indovinato in {tentativi} tentativi"')]},
-  {name:'Media dei voti (lista)',build:()=>[A('voti','[0.0] * 5'),A('somma','0'),F('i','0','5','1',[I('voti[i]','float','f"Voto {i + 1}: "'),A('somma','somma + voti[i]')]),O('f"Media: {somma / 5:.2f}"')]},
-  {name:'Lista della spesa (append)',build:()=>[A('spesa','[]'),I('cosa','str','"Cosa compri? (Invio vuoto per finire) "'),W('cosa != ""',[A('','spesa.append(cosa)'),I('cosa','str','"Cosa compri? "')]),O('"Hai", len(spesa), "articoli:", spesa')]}
 ];
 
 let prog={body:[]};
