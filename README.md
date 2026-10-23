@@ -16,7 +16,7 @@ Funziona nel browser, anche da tablet e telefono. Non serve installare nulla né
 3. **Trascina** un blocco su un altro punto **+** per spostarlo, anche dentro un Se o un ciclo. Tieni premuto **Ctrl** mentre lo rilasci per farne una copia; **Esc** annulla. Da tastiera: seleziona il blocco con Tab e usa **Alt+↑ / Alt+↓**.
 4. Con **Casella di testo** aggiungi un riquadro per il testo del problema, i dati di input e output o qualche appunto. Trascinalo dove vuoi, allargalo dal triangolino in basso a destra, cliccalo per modificarlo o cambiarne il colore. Le caselle non vengono eseguite e non compaiono nel codice, ma vengono salvate con il diagramma ed esportate nel PDF.
 5. Premi **Esegui** per far girare il programma, oppure **Passo** per avanzare un blocco alla volta.
-6. Guarda la **console** (output e input) e la tabella delle **variabili**.
+6. Guarda la **console** (output e input) e la tabella delle **variabili**. Il pulsante **Pannello**, in alto a destra, nasconde o mostra la colonna con console, variabili e codice per lasciare più spazio al diagramma; quando esegui il programma il pannello si riapre da solo.
 7. Nella scheda **Codice** trovi il programma tradotto in Python e in pseudocodice.
 
 Un blocco con il bordo rosso tratteggiato contiene un errore: cliccalo per leggere cosa non va.

@@ -71,6 +71,9 @@ select.btn{padding-right:8px}
 
 /* workbench */
 .work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 370px}
+body.side-off .work{grid-template-columns:minmax(0,1fr)}
+body.side-off .side{display:none}
+#btnSide[aria-pressed="true"]{background:var(--surface2);border-color:var(--muted)}
 .canvas-wrap{position:relative;min-width:0;min-height:0;display:flex}
 #scroller{flex:1;min-width:0;overflow:auto;background-color:var(--bg);background-image:radial-gradient(var(--grid) 1px,transparent 1.3px);background-size:18px 18px}
 #chart{display:block;margin:0 auto;user-select:none;-webkit-user-select:none}
@@ -238,6 +241,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
   html,body{height:auto}
   .work{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}
   .side{border-left:0;border-top:1px solid var(--rule);min-height:480px}
+  body.side-off .work{grid-template-rows:80vh}
   .speed input{width:80px}
 }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
@@ -268,6 +272,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
     <button class="btn" id="btnStop" type="button" disabled><svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>Stop</button>
     <label class="speed" for="speed">Velocità <input type="range" id="speed" min="0" max="5" step="1" value="3"><output id="speedLbl">Media</output></label>
     <span class="status" id="status" data-s="idle">Pronto</span>
+    <button class="btn" id="btnSide" type="button" aria-pressed="true" aria-controls="side" title="Nascondi il pannello con console, variabili e codice"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5"/><path d="M10 2.75v10.5"/></svg><span>Pannello</span></button>
   </div>
 </header>
 
@@ -284,7 +289,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
     <div id="menu" hidden role="menu"></div>
   </section>
 
-  <aside class="side">
+  <aside class="side" id="side">
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tabRun" aria-selected="true" aria-controls="pRun">Esecuzione</button>
       <button class="tab" role="tab" id="tabCode" aria-selected="false" aria-controls="pCode">Codice</button>
@@ -1725,7 +1730,17 @@ $('#exPng').onclick=async()=>{
 $('#ioSave').onclick=async()=>{ioErr.hidden=true;if(await offerFile('diagramma.json',ioText.value,ioErr)) toast('File salvato.');};
 
 /* ---------- tabs & keys ---------- */
+const SIDE_KEY='flussogramma.pannello';
+function setSide(on,remember){
+  document.body.classList.toggle('side-off',!on);
+  const b=$('#btnSide');b.setAttribute('aria-pressed',String(on));
+  b.title=on?'Nascondi il pannello con console, variabili e codice':'Mostra il pannello con console, variabili e codice';
+  if(remember){try{localStorage.setItem(SIDE_KEY,on?'on':'off');}catch(e){}}
+}
+$('#btnSide').onclick=()=>{const on=document.body.classList.contains('side-off');setSide(on,true);if(!on) toast('Pannello nascosto: si riapre da solo quando esegui il programma.');};
+try{if(localStorage.getItem(SIDE_KEY)==='off') setSide(false,false);}catch(e){}
 function selectTab(t){
+  if(document.body.classList.contains('side-off')) setSide(true,false);
   const r=t==='run';
   $('#tabRun').setAttribute('aria-selected',String(r));$('#tabCode').setAttribute('aria-selected',String(!r));
   $('#pRun').hidden=!r;$('#pCode').hidden=r;
