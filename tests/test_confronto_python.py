@@ -86,6 +86,8 @@ CASES = [
       A('k', '10'), DO([O('"una volta"'), A('k', 'k + 1')], 'k < 5'), O('k')], [], ''),
   ('input di testo', [I('nome', 'str', '"Nome: "'), I('vuoto', 'str'), O('"Ciao", nome + "!", len(vuoto), [nome, vuoto]')],
       ['Mario Rossi', ''], ''),
+  ('input bool True', [I('ok', 'bool', '"Hai finito? "'), IF('ok', [O('"bene"')], [O('"continua"')]), O('ok, not ok')], ['True'], ''),
+  ('input bool False', [I('ok', 'bool'), I('altro', 'bool'), O('ok or altro, ok and altro, [ok, altro]')], ['False', 'True'], ''),
   ('input numeri grandi e decimali', [I('a', 'int'), I('b', 'float', '"b="'), O('a * a, b * 2, a + b')],
       ['123456789012345678901234567890', '1e3'], ''),
   ('f-string e print', [

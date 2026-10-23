@@ -40,6 +40,7 @@ Un blocco con il bordo rosso tratteggiato contiene un errore: cliccalo per legge
 - Maiuscole e minuscole contano: `Somma` e `somma` sono variabili diverse.
 - I tipi sono quelli di Python: `int`, `float`, `str`, `bool`, `list`. Per esempio `10 / 2` vale `5.0`.
 - Il ciclo **Per** funziona come `range()`: la **fine è esclusa**. Per contare da 1 a 10 scrivi Inizio `1` e Fine `11`.
+- L'**Input** può leggere un `int`, un `float`, un `str` o un `bool`. Per un `bool` si scrive `True` o `False` e in Python diventa `x = input() == "True"`.
 - Per unire testo e numeri usa una f-string, con le variabili tra graffe: `f"La somma è {somma}"`, `f"Media: {media:.2f}"`.
 
 Operatori e funzioni disponibili:
