@@ -73,7 +73,14 @@ select.btn{padding-right:8px}
 .work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 370px}
 body.side-off .work{grid-template-columns:minmax(0,1fr)}
 body.side-off .side{display:none}
-#btnSide[aria-pressed="true"]{background:var(--surface2);border-color:var(--muted)}
+.side{position:relative}
+.side-tog{position:absolute;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid var(--rule);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+.side-tog:hover{background:var(--surface2);border-color:var(--muted)}
+.side-tog svg{width:16px;height:16px}
+#btnSideHide{top:6px;right:10px}
+#btnSideShow{top:12px;right:14px;z-index:5;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+body:not(.side-off) #btnSideShow{display:none}
+.tabs{padding-right:52px}
 .canvas-wrap{position:relative;min-width:0;min-height:0;display:flex}
 #scroller{flex:1;min-width:0;overflow:auto;background-color:var(--bg);background-image:radial-gradient(var(--grid) 1px,transparent 1.3px);background-size:18px 18px}
 #chart{display:block;margin:0 auto;user-select:none;-webkit-user-select:none}
@@ -242,6 +249,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
   .work{grid-template-columns:minmax(0,1fr);grid-template-rows:62vh auto}
   .side{border-left:0;border-top:1px solid var(--rule);min-height:480px}
   body.side-off .work{grid-template-rows:80vh}
+  #btnSideHide svg{transform:rotate(90deg)} #btnSideShow svg{transform:rotate(-90deg)}
   .speed input{width:80px}
 }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
@@ -272,7 +280,6 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
     <button class="btn" id="btnStop" type="button" disabled><svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg>Stop</button>
     <label class="speed" for="speed">Velocità <input type="range" id="speed" min="0" max="5" step="1" value="3"><output id="speedLbl">Media</output></label>
     <span class="status" id="status" data-s="idle">Pronto</span>
-    <button class="btn" id="btnSide" type="button" aria-pressed="true" aria-controls="side" title="Nascondi il pannello con console, variabili e codice"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5"/><path d="M10 2.75v10.5"/></svg><span>Pannello</span></button>
   </div>
 </header>
 
@@ -280,6 +287,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
   <section class="canvas-wrap" id="wrap">
     <div id="scroller"><svg id="chart" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Diagramma di flusso"></svg></div>
     <div class="legend-tip" id="tip">Clicca un <b>+</b> per aggiungere un blocco · clicca un blocco per modificarlo · trascinalo per spostarlo</div>
+    <button class="side-tog" id="btnSideShow" type="button" aria-controls="side" aria-expanded="false" aria-label="Mostra il pannello" title="Mostra il pannello con console, variabili e codice"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg></button>
     <div class="zoom" role="group" aria-label="Zoom">
       <button type="button" id="zOut" aria-label="Riduci">−</button>
       <span class="zl" id="zLbl">100%</span>
@@ -290,6 +298,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
   </section>
 
   <aside class="side" id="side">
+    <button class="side-tog" id="btnSideHide" type="button" aria-controls="side" aria-expanded="true" aria-label="Nascondi il pannello" title="Nascondi il pannello"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg></button>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tabRun" aria-selected="true" aria-controls="pRun">Esecuzione</button>
       <button class="tab" role="tab" id="tabCode" aria-selected="false" aria-controls="pCode">Codice</button>
@@ -1734,11 +1743,11 @@ $('#ioSave').onclick=async()=>{ioErr.hidden=true;if(await offerFile('diagramma.j
 const SIDE_KEY='flussogramma.pannello';
 function setSide(on,remember){
   document.body.classList.toggle('side-off',!on);
-  const b=$('#btnSide');b.setAttribute('aria-pressed',String(on));
-  b.title=on?'Nascondi il pannello con console, variabili e codice':'Mostra il pannello con console, variabili e codice';
+  $('#btnSideShow').setAttribute('aria-expanded',String(on));$('#btnSideHide').setAttribute('aria-expanded',String(on));
   if(remember){try{localStorage.setItem(SIDE_KEY,on?'on':'off');}catch(e){}}
 }
-$('#btnSide').onclick=()=>{const on=document.body.classList.contains('side-off');setSide(on,true);if(!on) toast('Pannello nascosto: si riapre da solo quando esegui il programma.');};
+$('#btnSideHide').onclick=()=>{setSide(false,true);$('#btnSideShow').focus();toast('Pannello nascosto: si riapre da solo quando esegui il programma.');};
+$('#btnSideShow').onclick=()=>{setSide(true,true);$('#btnSideHide').focus();};
 try{if(localStorage.getItem(SIDE_KEY)==='off') setSide(false,false);}catch(e){}
 function selectTab(t){
   if(document.body.classList.contains('side-off')) setSide(true,false);
