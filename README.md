@@ -27,7 +27,7 @@ Un blocco con il bordo rosso tratteggiato contiene un errore: cliccalo per legge
 |---|---|---|
 | Assegna | rettangolo | `somma = somma + i` |
 | Input | parallelogramma blu | `n = int(input("Inserisci n: "))` |
-| Output | parallelogramma verde | `print("La somma è", somma)` |
+| Output | parallelogramma verde | `print(f"La somma è {somma}")` |
 | Se (if) | rombo rosso | `if n % 2 == 0:` … `else:` |
 | Mentre (while) | rombo viola | `while n > 0:` |
 | Per (for) | esagono viola | `for i in range(1, 11):` |
@@ -40,7 +40,7 @@ Un blocco con il bordo rosso tratteggiato contiene un errore: cliccalo per legge
 - Maiuscole e minuscole contano: `Somma` e `somma` sono variabili diverse.
 - I tipi sono quelli di Python: `int`, `float`, `str`, `bool`, `list`. Per esempio `10 / 2` vale `5.0`.
 - Il ciclo **Per** funziona come `range()`: la **fine è esclusa**. Per contare da 1 a 10 scrivi Inizio `1` e Fine `11`.
-- Per unire testo e numeri usa la virgola nell'Output, `str(x)` oppure una f-string: `f"Media: {media:.2f}"`.
+- Per unire testo e numeri usa una f-string, con le variabili tra graffe: `f"La somma è {somma}"`, `f"Media: {media:.2f}"`.
 
 Operatori e funzioni disponibili:
 

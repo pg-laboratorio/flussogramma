@@ -445,8 +445,8 @@ const F=(v,start,stop,step,body)=>make('for',{v,start,stop,step,body});
 const DO=(body,cond)=>make('do',{body,cond});
 const C=text=>make('comment',{text});
 const EXAMPLES=[
-  {name:'Somma da 1 a N',build:()=>[I('n','int','"Quanti numeri vuoi sommare? "'),A('somma','0'),F('i','1','n + 1','1',[A('somma','somma + i')]),O('"La somma è", somma')]},
-  {name:'Pari o dispari',build:()=>[I('n','int','"Inserisci un numero intero: "'),IF('n % 2 == 0',[O('n, "è pari"')],[O('n, "è dispari"')])]},
+  {name:'Somma da 1 a N',build:()=>[I('n','int','"Quanti numeri vuoi sommare? "'),A('somma','0'),F('i','1','n + 1','1',[A('somma','somma + i')]),O('f"La somma è {somma}"')]},
+  {name:'Pari o dispari',build:()=>[I('n','int','"Inserisci un numero intero: "'),IF('n % 2 == 0',[O('f"{n} è pari"')],[O('f"{n} è dispari"')])]},
 ];
 
 let prog={body:[],notes:[]};
@@ -541,7 +541,7 @@ function contains(c,x,op){
 }
 function typeErr(op,x,y){
   let m=`non posso usare «${op}» tra ${pyType(x)} e ${pyType(y)}`;
-  if(op==='+'&&(typeof x==='string'||typeof y==='string')) m+=': per unire testo e numeri usa str(...), una f-string, oppure separa i valori con la virgola nell\'Output';
+  if(op==='+'&&(typeof x==='string'||typeof y==='string')) m+=': per unire testo e numeri usa una f-string, per esempio f"Totale: {n}"';
   return new RunErr(m);
 }
 function repeatSeq(s,n){n=Math.max(0,nv(n));if(typeof s==='string') return s.repeat(n);const r=[];for(let k=0;k<n;k++) r.push(...s);return r;}
@@ -1293,7 +1293,7 @@ function activate(t){
 const ED={
   assign:{title:'Assegna',desc:'Calcola il valore e lo mette nella variabile. Se la variabile non esiste ancora, viene creata, come in Python. Lascia vuota la Variabile per un\'istruzione come lista.append(x).',fields:[['target','Variabile','text','es. somma'],['expr','Valore','text','es. somma + i']]},
   input:{title:'Input',desc:'Il programma si ferma, l\'utente digita un valore e il valore, convertito nel tipo scelto, finisce nella variabile.',fields:[['target','Variabile','text','es. n'],['vtype','Tipo di dato','vt'],['msg','Messaggio (facoltativo)','text','es. "Inserisci n: "']]},
-  output:{title:'Output',desc:'Stampa nella console, come print(). Separa più valori con la virgola: vengono stampati con uno spazio in mezzo.',fields:[['expr','Cosa stampare','text','es. "La somma è", somma'],['nl','Vai a capo alla fine','check']]},
+  output:{title:'Output',desc:'Stampa nella console, come print(). Per unire testo e valori usa una f-string, con le variabili tra graffe.',fields:[['expr','Cosa stampare','text','es. f"La somma è {somma}"'],['nl','Vai a capo alla fine','check']]},
   if:{title:'Se (if)',desc:'Se la condizione è vera esegue il ramo True (a destra), altrimenti il ramo False (a sinistra).',fields:[['cond','Condizione','text','es. n % 2 == 0']]},
   while:{title:'Mentre (while)',desc:'Controlla la condizione e, finché è vera, ripete i blocchi interni.',fields:[['cond','Condizione','text','es. n > 0']]},
   for:{title:'Per (for)',desc:'Come for … in range() di Python: il contatore parte da Inizio e si ferma prima di Fine. Per contare da 1 a 10 scrivi Inizio 1 e Fine 11.',fields:[['v','Variabile contatore','text','es. i'],['start','Inizio','short','0'],['stop','Fine (esclusa)','short','10'],['step','Passo','short','1']]},
