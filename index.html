@@ -18,7 +18,7 @@
   --decl-f:#fff0b3; --decl-s:#9c7a00; --asg-f:#ffdcc0; --asg-s:#bd5612; --in-f:#d4e8fb; --in-s:#2c6aa8;
   --out-f:#d4efd5; --out-s:#2f7f3e; --if-f:#fcd6da; --if-s:#b23a4a; --loop-f:#e6dcfa; --loop-s:#6844b0;
   --cm-f:#eef0ee; --cm-s:#8a928f; --oval-f:#ffffff;
-  --ny-f:#fff3b0; --ny-s:#d4ad1c; --nb-f:#dcecfc; --nb-s:#6d9acb; --ng-f:#ddf2d8; --ng-s:#6aa565; --np-f:#fde1ea; --np-s:#cf7f9b; --n-shadow:rgba(40,40,20,.12);
+  --ny-f:#fff3b0; --ny-s:#d4ad1c; --nb-f:#dcecfc; --nb-s:#6d9acb; --ng-f:#ddf2d8; --ng-s:#6aa565; --np-f:#fde1ea; --np-s:#cf7f9b; --nn-f:#eef1f0; --nn-s:#9aa5a2; --n-shadow:rgba(40,40,20,.12);
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   --display:"Bricolage Grotesque","IBM Plex Sans",system-ui,sans-serif;
@@ -30,7 +30,7 @@
   --decl-f:#3a3112; --decl-s:#e0bc45; --asg-f:#40271a; --asg-s:#f0975a; --in-f:#15304a; --in-s:#7db6ee;
   --out-f:#173822; --out-s:#7fcf8c; --if-f:#47202a; --if-s:#f08896; --loop-f:#2d2347; --loop-s:#b398f0;
   --cm-f:#222a28; --cm-s:#8d9894; --oval-f:#171f1d; color-scheme:dark;
-  --ny-f:#3d3614; --ny-s:#b39324; --nb-f:#182c40; --nb-s:#5786b8; --ng-f:#1d3520; --ng-s:#5c9a5a; --np-f:#3e1f2b; --np-s:#b8708a; --n-shadow:rgba(0,0,0,.35);
+  --ny-f:#3d3614; --ny-s:#b39324; --nb-f:#182c40; --nb-s:#5786b8; --ng-f:#1d3520; --ng-s:#5c9a5a; --np-f:#3e1f2b; --np-s:#b8708a; --nn-f:#232b29; --nn-s:#7f8c88; --n-shadow:rgba(0,0,0,.35);
 }}
 :root[data-theme="dark"]{
   --bg:#101614; --surface:#171f1d; --surface2:#1c2623; --ink:#e2eae7; --muted:#93a39e; --rule:#2b3734;
@@ -39,7 +39,7 @@
   --decl-f:#3a3112; --decl-s:#e0bc45; --asg-f:#40271a; --asg-s:#f0975a; --in-f:#15304a; --in-s:#7db6ee;
   --out-f:#173822; --out-s:#7fcf8c; --if-f:#47202a; --if-s:#f08896; --loop-f:#2d2347; --loop-s:#b398f0;
   --cm-f:#222a28; --cm-s:#8d9894; --oval-f:#171f1d; color-scheme:dark;
-  --ny-f:#3d3614; --ny-s:#b39324; --nb-f:#182c40; --nb-s:#5786b8; --ng-f:#1d3520; --ng-s:#5c9a5a; --np-f:#3e1f2b; --np-s:#b8708a; --n-shadow:rgba(0,0,0,.35);
+  --ny-f:#3d3614; --ny-s:#b39324; --nb-f:#182c40; --nb-s:#5786b8; --ng-f:#1d3520; --ng-s:#5c9a5a; --np-f:#3e1f2b; --np-s:#b8708a; --nn-f:#232b29; --nn-s:#7f8c88; --n-shadow:rgba(0,0,0,.35);
 }
 [hidden]{display:none!important}
 html,body{height:100%}
@@ -123,6 +123,7 @@ body.dragging #chart .blk:hover .sh{stroke-width:1.6}
 #chart .note-bg{stroke-width:1.2}
 #chart .c-y .note-bg{fill:var(--ny-f);stroke:var(--ny-s)} #chart .c-b .note-bg{fill:var(--nb-f);stroke:var(--nb-s)}
 #chart .c-g .note-bg{fill:var(--ng-f);stroke:var(--ng-s)} #chart .c-p .note-bg{fill:var(--np-f);stroke:var(--np-s)}
+#chart .c-n .note-bg{fill:var(--nn-f);stroke:var(--nn-s)}
 #chart .note:hover .note-bg,#chart .note:focus-visible .note-bg{stroke-width:2.4}
 #chart .note:focus-visible .note-bg{stroke:var(--accent)}
 #chart .note-tt{font:600 14px "IBM Plex Sans",Arial,Helvetica,sans-serif;fill:var(--ink)}
@@ -142,6 +143,7 @@ body.dragging #chart .blk:hover .sh{stroke-width:1.6}
 .colors input:focus-visible+.sw{outline:2px solid var(--accent);outline-offset:3px}
 .sw.c-y{background:var(--ny-f);border-color:var(--ny-s)} .sw.c-b{background:var(--nb-f);border-color:var(--nb-s)}
 .sw.c-g{background:var(--ng-f);border-color:var(--ng-s)} .sw.c-p{background:var(--np-f);border-color:var(--np-s)}
+.sw.c-n{background:var(--nn-f);border-color:var(--nn-s)}
 .lbl-s{font-size:12px;font-weight:600;color:var(--muted)}
 body.dragging #chart .ins-dot{opacity:1;stroke:var(--accent);stroke-width:1.6}
 body.dragging #chart .ins-plus{opacity:.9;stroke:var(--accent)}
@@ -375,6 +377,7 @@ details.hint dd{margin:0;font-family:var(--mono);overflow-wrap:anywhere}
           <label><input type="radio" name="ntCol" value="b" id="ntColB"><span class="sw c-b"></span>Azzurro</label>
           <label><input type="radio" name="ntCol" value="g" id="ntColG"><span class="sw c-g"></span>Verde</label>
           <label><input type="radio" name="ntCol" value="p" id="ntColP"><span class="sw c-p"></span>Rosa</label>
+          <label><input type="radio" name="ntCol" value="n" id="ntColN"><span class="sw c-n"></span>Grigio</label>
         </div></div>
       <div class="dlg-actions">
         <div><button class="btn danger" type="button" id="ntDel">Elimina</button></div>
@@ -450,7 +453,7 @@ const EXAMPLES=[
 ];
 
 let prog={body:[],notes:[]};
-const NOTE_COLORS=['y','b','g','p'];
+const NOTE_COLORS=['y','b','g','p','n'];
 function sanitizeNotes(arr){
   if(!Array.isArray(arr)) return [];
   const num=(v,d,lo,hi)=>{v=Number(v);return isFinite(v)?Math.round(Math.min(hi,Math.max(lo,v))):d;};
@@ -1594,7 +1597,7 @@ const EXPORT_CSS=`.fl{fill:none;stroke:#2e3d45;stroke-width:1.6;stroke-linejoin:
 .k-comment .sh{fill:#eef0ee;stroke:#8a928f;stroke-dasharray:4 3}.k-comment .sh2{stroke:#8a928f}.k-comment .tx{font-style:italic;fill:#5a6a70}
 .bad .sh{stroke:#c4314b;stroke-dasharray:5 3;stroke-width:2.2}
 .note-sd{fill:rgba(40,40,20,.12)}.note-bg{stroke-width:1.2}
-.c-y .note-bg{fill:#fff3b0;stroke:#d4ad1c}.c-b .note-bg{fill:#dcecfc;stroke:#6d9acb}.c-g .note-bg{fill:#ddf2d8;stroke:#6aa565}.c-p .note-bg{fill:#fde1ea;stroke:#cf7f9b}
+.c-y .note-bg{fill:#fff3b0;stroke:#d4ad1c}.c-b .note-bg{fill:#dcecfc;stroke:#6d9acb}.c-g .note-bg{fill:#ddf2d8;stroke:#6aa565}.c-p .note-bg{fill:#fde1ea;stroke:#cf7f9b}.c-n .note-bg{fill:#eef1f0;stroke:#9aa5a2}
 .note-tt{font:600 14px 'IBM Plex Sans',Arial,Helvetica,sans-serif;fill:#17232b}
 .note-tx{font:13px 'IBM Plex Sans',Arial,Helvetica,sans-serif;fill:#17232b;white-space:pre}
 .note-hr{stroke:#17232b;stroke-opacity:.18;stroke-width:1}`;
