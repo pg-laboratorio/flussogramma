@@ -420,7 +420,7 @@ const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'
 const NB=' ';
 const IDRE=/^[A-Za-z_À-ɏ][A-Za-z0-9_À-ɏ]*$/;
 const KEYWORDS=new Set('False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield'.split(' '));
-const VTL={int:'numero intero',float:'numero decimale',str:'testo'};
+const VTL={int:'numero intero',float:'numero decimale',str:'testo',bool:'valore logico (True o False)'};
 let uid=1; const nid=()=>'n'+(uid++);
 
 /* ---------- model ---------- */
@@ -892,7 +892,7 @@ function nodeErrors(n){
 function pyHead(n){
   switch(n.t){
     case 'assign': return n.target.trim()?`${n.target.trim()} = ${n.expr.trim()}`:n.expr.trim();
-    case 'input':{const inner=`input(${n.msg.trim()})`;return `${n.target.trim()} = ${n.vtype==='str'?inner:`${n.vtype}(${inner})`}`;}
+    case 'input':{const inner=`input(${n.msg.trim()})`;return `${n.target.trim()} = ${n.vtype==='str'?inner:n.vtype==='bool'?`${inner} == "True"`:`${n.vtype}(${inner})`}`;}
     case 'output':{const a=n.expr.trim();return `print(${a}${n.nl?'':(a?', end=""':'end=""')})`;}
     case 'if': return `if ${n.cond.trim()}:`;
     case 'while': return `while ${n.cond.trim()}:`;
@@ -1391,6 +1391,7 @@ speedEl.oninput=()=>{$('#speedLbl').textContent=SPEEDS[+speedEl.value][1];};
 function parseInput(raw,type){
   const s=raw.trim();
   if(type==='int'){if(!/^[+-]?\d+$/.test(s)) return {err:`«${raw}» non si può convertire in int (numero intero). Riprova.`};return {v:normI(BigInt(s))};}
+  if(type==='bool'){if(raw==='True') return {v:true};if(raw==='False') return {v:false};return {err:/^\s*(true|false|vero|falso)\s*$/i.test(raw)?`Scrivi esattamente True oppure False, con la maiuscola iniziale. Riprova.`:`«${raw}» non è un valore logico: scrivi True oppure False. Riprova.`};}
   if(type==='float'){if(/^[+-]?\d+,\d+$/.test(s)) return {err:`In Python i decimali si scrivono con il punto: ${s.replace(',','.')}. Riprova.`};if(!FLOATRE.test(s)) return {err:`«${raw}» non si può convertire in float (numero). Riprova.`};return {v:new Fl(parseFloat(s))};}
   return {v:raw};
 }
@@ -1484,9 +1485,9 @@ function askInput(v){
   run.waiting=v;
   setState(run.state,'input');
   inForm.classList.add('waiting');
-  inLbl.textContent=`${v.label} = ${v.vtype==='str'?'input()':v.vtype+'(input())'}  ·  scrivi un ${VTL[v.vtype]}`;
+  inLbl.textContent=`${v.label} = ${v.vtype==='str'?'input()':v.vtype==='bool'?'input() == "True"':v.vtype+'(input())'}  ·  scrivi un ${VTL[v.vtype]}`;
   inField.disabled=inBtn.disabled=false;inField.value='';
-  inField.placeholder=v.vtype==='int'?'es. 42':v.vtype==='float'?'es. 3.5':'testo';
+  inField.placeholder=v.vtype==='int'?'es. 42':v.vtype==='float'?'es. 3.5':v.vtype==='bool'?'True oppure False':'testo';
   refreshVars();selectTab('run');
   setTimeout(()=>inField.focus(),0);
 }
@@ -1550,7 +1551,7 @@ function genPseudo(){
   function node(n,d){const I=ind(d);
     switch(n.t){
       case 'assign': L.push(n.target.trim()?`${I}${n.target.trim()} ← ${n.expr.trim()}`:`${I}ESEGUI ${n.expr.trim()}`);break;
-      case 'input': if(n.msg.trim()) L.push(`${I}SCRIVI ${n.msg.trim()}`);L.push(`${I}LEGGI ${n.target.trim()}   (${VTL[n.vtype]})`);break;
+      case 'input': if(n.msg.trim()) L.push(`${I}SCRIVI ${n.msg.trim()}`);L.push(`${I}LEGGI ${n.target.trim()}   (${VTL[n.vtype].replace(/ \(.*\)$/,"")})`);break;
       case 'output': L.push(`${I}SCRIVI ${n.expr.trim()}`);break;
       case 'if': L.push(`${I}SE ${n.cond.trim()} ALLORA`);seq(n.yes,d+1);if(n.no.length){L.push(`${I}ALTRIMENTI`);seq(n.no,d+1);}L.push(`${I}FINE SE`);break;
       case 'while': L.push(`${I}MENTRE ${n.cond.trim()} ESEGUI`);seq(n.body,d+1);L.push(`${I}FINE MENTRE`);break;
