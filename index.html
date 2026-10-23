@@ -445,8 +445,8 @@ const F=(v,start,stop,step,body)=>make('for',{v,start,stop,step,body});
 const DO=(body,cond)=>make('do',{body,cond});
 const C=text=>make('comment',{text});
 const EXAMPLES=[
-  {name:'Somma da 1 a N',build:()=>[I('n','int','"Quanti numeri vuoi sommare? "'),A('somma','0'),F('i','1','n + 1','1',[A('somma','somma + i')]),O('"La somma è", somma')]},
-  {name:'Pari o dispari',build:()=>[I('n','int','"Inserisci un numero intero: "'),IF('n % 2 == 0',[O('n, "è pari"')],[O('n, "è dispari"')])]},
+  {name:'Somma da 1 a N',build:()=>[I('n','int','"Quanti numeri vuoi sommare? "'),A('somma','0'),F('i','1','n + 1','1',[A('somma','somma + i')]),O('f"La somma è {somma}"')]},
+  {name:'Pari o dispari',build:()=>[I('n','int','"Inserisci un numero intero: "'),IF('n % 2 == 0',[O('f"{n} è pari"')],[O('f"{n} è dispari"')])]},
 ];
 
 let prog={body:[],notes:[]};
@@ -541,7 +541,7 @@ function contains(c,x,op){
 }
 function typeErr(op,x,y){
   let m=`non posso usare «${op}» tra ${pyType(x)} e ${pyType(y)}`;
-  if(op==='+'&&(typeof x==='string'||typeof y==='string')) m+=': per unire testo e numeri usa str(...), una f-string, oppure separa i valori con la virgola nell\'Output';
+  if(op==='+'&&(typeof x==='string'||typeof y==='string')) m+=': per unire testo e numeri usa una f-string, per esempio f"Totale: {n}"';
   return new RunErr(m);
 }
 function repeatSeq(s,n){n=Math.max(0,nv(n));if(typeof s==='string') return s.repeat(n);const r=[];for(let k=0;k<n;k++) r.push(...s);return r;}
